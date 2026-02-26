@@ -8,6 +8,7 @@ export const mockCurrentUser: User = {
   displayName: 'Hiroki',
   bio: 'Connect Club 開発者 🎙️',
   avatarUrl: null,
+  isAnonymous: false,
   followers: ['u1', 'u2', 'u3'],
   following: ['u1', 'u4'],
   clubIds: ['club1', 'club2'],
