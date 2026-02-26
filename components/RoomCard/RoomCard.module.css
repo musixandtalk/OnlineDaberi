@@ -1,0 +1,255 @@
+/* =============================================
+   部屋カードコンポーネントスタイル
+   ============================================= */
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  padding: 20px;
+  cursor: pointer;
+  transition: all var(--transition-md);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: fadeIn 0.4s ease forwards;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  overflow: hidden;
+  text-decoration: none;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--accent-gradient-soft);
+  opacity: 0;
+  transition: opacity var(--transition-md);
+  pointer-events: none;
+}
+
+.card:hover {
+  border-color: var(--border-accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-accent);
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+/* ヘッダー部分 */
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cardMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* クラブバッジ */
+.clubBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: var(--border-radius-full);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-accent);
+}
+
+/* タイトル・説明 */
+.cardTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.cardDescription {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* スピーカーエリア */
+.speakerSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.speakerLabel {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.speakerList {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* スピーカーアイテム */
+.speakerItem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.speakerAvatar {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+  border: 2px solid transparent;
+  transition: border-color var(--transition-fast);
+}
+
+.speakerAvatar.speaking {
+  border-color: var(--accent-primary);
+  animation: speaking-pulse 2s ease-in-out infinite;
+}
+
+.speakerMicIcon {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  font-size: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.speakerInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.speakerName {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.speakerRole {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+/* フッター（参加者数・タグ） */
+.cardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+}
+
+.statsRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.statIcon {
+  font-size: 0.85rem;
+}
+
+.tagList {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  padding: 2px 8px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-full);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  transition: all var(--transition-fast);
+}
+
+.card:hover .tag {
+  border-color: var(--border-accent);
+  color: var(--text-accent);
+}
+
+/* 参加ボタン */
+.joinBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  background: var(--accent-gradient);
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: var(--border-radius-full);
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+  box-shadow: 0 0 16px rgba(124, 58, 237, 0.25);
+}
+
+.card:hover .joinBtn {
+  box-shadow: 0 0 24px rgba(124, 58, 237, 0.4);
+  transform: scale(1.02);
+}
+
+/* 時間表示 */
+.timeAgo {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}

@@ -1,0 +1,289 @@
+/* =============================================
+   サイドバーコンポーネントスタイル
+   ============================================= */
+
+.sidebar {
+  width: var(--sidebar-width);
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  overflow-y: auto;
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* PC では常に表示（transform なし）。モバイルのみ隠す */
+.sidebarOpen {
+  /* モバイルのメディアクエリで上書きされる。PCでは無効 */
+}
+
+
+/* ロゴエリア */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* モバイル用 × 閉じるボタン（PCでは非表示） */
+.closeBtn {
+  display: none;
+  margin-left: auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.closeBtn:hover {
+  background: var(--bg-glass-hover);
+  color: var(--text-primary);
+}
+
+/* モバイルオーバーレイ（背景を暗くして外タップで閉じる） */
+.overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 299;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.logoIcon {
+  width: 36px;
+  height: 36px;
+  background: var(--accent-gradient);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-accent);
+}
+
+.logoText {
+  font-size: 1.1rem;
+  font-weight: 800;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
+}
+
+/* ナビゲーション */
+.nav {
+  padding: 12px 12px;
+  flex: 1;
+}
+
+.navSection {
+  margin-bottom: 24px;
+}
+
+.navSectionLabel {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0 8px;
+  margin-bottom: 6px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--border-radius-md);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-decoration: none;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+}
+
+.navItem:hover {
+  background: var(--bg-glass);
+  color: var(--text-primary);
+}
+
+.navItem.active {
+  background: rgba(124, 58, 237, 0.12);
+  color: var(--text-accent);
+}
+
+.navItemIcon {
+  font-size: 1.1rem;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.navItemBadge {
+  margin-left: auto;
+  background: var(--accent-primary);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--border-radius-full);
+}
+
+/* クラブリスト */
+.clubList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.clubItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: var(--border-radius-md);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-decoration: none;
+}
+
+.clubItem:hover {
+  background: var(--bg-glass);
+  color: var(--text-primary);
+}
+
+.clubAvatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: var(--accent-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+}
+
+.clubName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ユーザープロフィールエリア（下部） */
+.userArea {
+  padding: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.userCard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.userCard:hover {
+  background: var(--bg-glass);
+}
+
+.userInfo {
+  flex: 1;
+  overflow: hidden;
+}
+
+.userName {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.userHandle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.userSettings {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  transition: all var(--transition-fast);
+}
+
+.userSettings:hover {
+  background: var(--bg-glass);
+  color: var(--text-primary);
+}
+
+/* =============================================
+   レスポンシブ対応（モバイルドロワー）
+   ============================================= */
+@media (max-width: 768px) {
+  /* サイドバーを左に隠す */
+  .sidebar {
+    transform: translateX(-100%);
+    width: min(var(--sidebar-width), 85vw);
+  }
+
+  /* 開いたときは .sidebarOpen クラスを付ける */
+  .sidebarOpen {
+    transform: translateX(0) !important;
+    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.5);
+  }
+
+  /* オーバーレイを表示 */
+  .overlay {
+    display: block;
+  }
+
+  /* 閉じるボタンを表示 */
+  .closeBtn {
+    display: flex;
+  }
+}

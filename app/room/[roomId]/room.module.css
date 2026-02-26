@@ -1,0 +1,689 @@
+/* =============================================
+   音声部屋ページスタイル
+   ============================================= */
+
+.roomLayout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg-primary);
+  background-image:
+    radial-gradient(ellipse at 30% 20%, rgba(124, 58, 237, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 70%, rgba(79, 70, 229, 0.06) 0%, transparent 60%);
+}
+
+/* ルームヘッダー */
+.roomHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: rgba(9, 11, 20, 0.9);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.roomHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.backBtn:hover {
+  background: var(--bg-glass-hover);
+  color: var(--text-primary);
+}
+
+.roomHeaderInfo {
+  flex: 1;
+}
+
+.roomHeaderTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.roomHeaderMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.roomHeaderClub {
+  font-size: 0.75rem;
+  color: var(--text-accent);
+}
+
+.roomHeaderCount {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.roomHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* =============================================
+   メインコンテンツ（空間マップ + サイドパネル）
+   ============================================= */
+.roomContent {
+  flex: 1;
+  display: flex;
+  gap: 0;
+  overflow: hidden;
+}
+
+/* 空間レイアウトエリア（左側・メイン） */
+.spatialArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+/* スピーカーセクション */
+.speakersSection {
+  margin-bottom: 32px;
+}
+
+.zoneTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.zoneTitle {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.zoneCount {
+  padding: 2px 8px;
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: var(--border-radius-full);
+  font-size: 0.7rem;
+  color: var(--text-accent);
+  font-weight: 700;
+}
+
+/* スピーカーグリッド（空間的に配置） */
+.speakerGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 24px;
+  min-height: 160px;
+  background: rgba(124, 58, 237, 0.03);
+  border: 1px dashed rgba(124, 58, 237, 0.2);
+  border-radius: var(--border-radius-xl);
+  position: relative;
+}
+
+/* スピーカーゾーンのラベル */
+.speakerGrid::before {
+  content: '🎙️ スピーカーゾーン';
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  font-size: 0.65rem;
+  color: rgba(124, 58, 237, 0.5);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+/* 参加者バブル（アバター） */
+.participantBubble {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.participantBubble:hover {
+  transform: translateY(-4px);
+}
+
+.bubbleAvatar {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: white;
+  border: 3px solid transparent;
+  transition: all var(--transition-fast);
+}
+
+/* 発話中のリングアニメーション */
+.bubbleAvatar.speaking {
+  border-color: var(--accent-primary);
+  box-shadow:
+    0 0 0 4px rgba(124, 58, 237, 0.2),
+    0 0 0 8px rgba(124, 58, 237, 0.08);
+  animation: speaking-pulse 2s ease-in-out infinite;
+}
+
+/* ホストの王冠 */
+.hostCrown {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1rem;
+  filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.5));
+  animation: float 3s ease-in-out infinite;
+}
+
+/* マイクアイコン */
+.micStatus {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 2px solid var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+}
+
+.micStatus.muted {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.micStatus.active {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.bubbleName {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bubbleRole {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+/* 手を挙げているバッジ */
+.handRaisedBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 22px;
+  height: 22px;
+  background: #f59e0b;
+  border-radius: 50%;
+  border: 2px solid var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  animation: float 1.5s ease-in-out infinite;
+}
+
+/* リスナーセクション */
+.listenersSection {
+  margin-top: 8px;
+}
+
+.listenerGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.06);
+  border-radius: var(--border-radius-xl);
+}
+
+.listenerGrid::before {
+  content: '';
+  display: block;
+  width: 100%;
+  margin-bottom: -4px;
+}
+
+/* リスナーバブル（小さめ） */
+.listenerBubble {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.listenerBubble:hover {
+  transform: translateY(-2px);
+}
+
+.listenerAvatar {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  border: 2px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.listenerBubble:hover .listenerAvatar {
+  border-color: var(--border-accent);
+  color: var(--text-primary);
+}
+
+.listenerName {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  max-width: 52px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* モアリスナー表示 */
+.moreListeners {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--bg-glass);
+  border: 1px dashed var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* サイドパネル（右側） — 幅を広げて見やすく */
+.sidePanel {
+  width: 360px;
+  min-width: 360px;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidePanelHeader {
+  padding: 14px 20px 0;
+  border-bottom: none;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* タブバー — ピル形デザイン */
+.sidePanelTabs {
+  display: flex;
+  padding: 8px 12px;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.sidePanelTab {
+  flex: 1;
+  padding: 7px 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+  background: none;
+  border-radius: var(--border-radius-md);
+  white-space: nowrap;
+}
+
+.sidePanelTab:hover {
+  color: var(--text-secondary);
+  background: var(--bg-glass);
+}
+
+.sidePanelTab.active {
+  color: var(--text-accent);
+  background: rgba(124, 58, 237, 0.12);
+  border-color: rgba(124, 58, 237, 0.25);
+}
+
+/* コンテンツエリア — おしゃれなスクロールバー */
+.sidePanelContent {
+  flex: 1;
+  padding: 16px 18px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124, 58, 237, 0.3) transparent;
+}
+
+.sidePanelContent::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidePanelContent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidePanelContent::-webkit-scrollbar-thumb {
+  background: rgba(124, 58, 237, 0.3);
+  border-radius: 2px;
+}
+
+/* チャットメッセージ — アバター付きバブルUI */
+.chatMessage {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  animation: fadeIn 0.25s ease forwards;
+}
+
+.chatAvatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: white;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.chatMessageBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.chatMessageHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-bottom: 4px;
+}
+
+.chatUserName {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-accent);
+}
+
+.chatTime {
+  font-size: 0.67rem;
+  color: var(--text-muted);
+}
+
+/* バブル形メッセージ本文 */
+.chatMessageText {
+  display: inline-block;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px 14px 14px 14px;
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+/* チャット入力エリア */
+.chatInputArea {
+  padding: 14px 18px;
+  border-top: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.chatInputRow {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.chatInput {
+  flex: 1;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  resize: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  line-height: 1.5;
+  font-family: inherit;
+}
+
+.chatInput:focus {
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+  outline: none;
+}
+
+.chatInput::placeholder {
+  color: var(--text-muted);
+}
+
+/* 丸い送信ボタン */
+.chatSendBtn {
+  width: 38px;
+  height: 38px;
+  background: var(--accent-gradient);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.35);
+}
+
+.chatSendBtn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.5);
+}
+
+.chatSendBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* =============================================
+   コントロールバー（下部）
+   ============================================= */
+.controlBar {
+  padding: 16px 32px;
+  background: rgba(9, 11, 20, 0.95);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.controlBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-width: 64px;
+}
+
+.controlBtn:hover {
+  background: var(--bg-glass-hover);
+  border-color: var(--border-accent);
+  color: var(--text-primary);
+}
+
+.controlBtn.active {
+  background: rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.4);
+  color: var(--text-accent);
+}
+
+.controlBtn.danger {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.controlBtn.danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.controlBtnIcon {
+  font-size: 1.4rem;
+}
+
+.controlBtnLabel {
+  font-size: 0.65rem;
+}
+
+/* ミュートボタン（大きめ・特別スタイル） */
+.muteBtn {
+  padding: 14px 24px;
+  min-width: 80px;
+}
+
+.muteBtn.muted {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #f87171;
+}
+
+.muteBtn.unmuted {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.35);
+  color: #4ade80;
+}
+
+/* 退出ボタン */
+.leaveBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 20px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--border-radius-lg);
+  color: #f87171;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.leaveBtn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* レスポンシブ */
+@media (max-width: 1024px) {
+  .sidePanel {
+    width: 320px;
+    min-width: 320px;
+  }
+}
+
+@media (max-width: 768px) {
+  .sidePanel {
+    display: none;
+  }
+
+  .controlBar {
+    padding: 12px 16px;
+    gap: 10px;
+  }
+
+  .controlBtn {
+    min-width: 52px;
+    padding: 10px 12px;
+  }
+
+  .spatialArea {
+    padding: 16px;
+  }
+}

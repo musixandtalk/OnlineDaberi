@@ -1,0 +1,412 @@
+/* =============================================
+   BGMミキサー（YouTube IFrame 2系統ミックス）
+   ============================================= */
+
+.mixer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* スクロール可能エリア */
+.scrollArea {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124, 58, 237, 0.3) transparent;
+}
+
+.scrollArea::-webkit-scrollbar { width: 4px; }
+.scrollArea::-webkit-scrollbar-track { background: transparent; }
+.scrollArea::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 2px; }
+
+/* URL入力パネル */
+.inputPanel {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(0,0,0,0.08);
+}
+
+.inputPanelLabel {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 7px;
+}
+
+.urlRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.urlInput {
+  flex: 1;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  font-family: inherit;
+}
+
+.urlInput:focus {
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+  outline: none;
+}
+
+.urlInput::placeholder { color: var(--text-muted); font-size: 0.75rem; }
+
+.urlBtn {
+  padding: 8px 12px;
+  background: var(--accent-gradient);
+  border: none;
+  border-radius: var(--border-radius-md);
+  color: white;
+  font-size: 0.85rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+  box-shadow: 0 2px 8px rgba(124,58,237,0.3);
+}
+
+.urlBtn:hover:not(:disabled) { opacity: 0.88; transform: scale(1.04); }
+.urlBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.urlErr {
+  margin-top: 5px;
+  font-size: 0.72rem;
+  color: #f87171;
+}
+
+.apiHint {
+  margin-top: 6px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.apiHint code {
+  background: rgba(0,0,0,0.3);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.67rem;
+}
+
+
+/* ─── ビジュアルヘッダー ─── */
+.visualHeader {
+  padding: 16px 18px 12px;
+  background: linear-gradient(180deg, rgba(124,58,237,0.08) 0%, transparent 100%);
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* NOW PLAYING 표示 */
+.nowPlaying {
+  padding: 10px 12px;
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.18);
+  border-radius: var(--border-radius-md);
+  margin-bottom: 12px;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nowPlayingDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+  animation: dotPulse 1.5s ease-in-out infinite;
+}
+
+.nowPlayingDot.paused {
+  background: var(--text-muted);
+  box-shadow: none;
+  animation: none;
+}
+
+@keyframes dotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.8); }
+}
+
+.nowPlayingInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.nowPlayingTitle {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nowPlayingLabel {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* 再生/停止メインボタン */
+.playBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  border: none;
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 16px rgba(124,58,237,0.4);
+  transition: all var(--transition-fast);
+}
+
+.playBtn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 22px rgba(124,58,237,0.55);
+}
+
+.playBtn.playing::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 2px solid rgba(124,58,237,0.4);
+  animation: ringOut 2s ease-in-out infinite;
+}
+
+@keyframes ringOut {
+  0%   { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+/* 波形バー（装飾） */
+.waveform {
+  display: flex;
+  align-items: flex-end;
+  gap: 2.5px;
+  height: 28px;
+  margin-bottom: 4px;
+}
+
+.waveBar {
+  width: 4px;
+  border-radius: 2px 2px 0 0;
+  background: rgba(124, 58, 237, 0.3);
+  height: 20%;
+  transition: height 0.15s ease;
+}
+
+.waveBar.active {
+  background: var(--accent-gradient);
+  animation: waveFloat var(--spd) ease-in-out infinite alternate;
+}
+
+@keyframes waveFloat {
+  from { height: 15%; }
+  to   { height: 90%; }
+}
+
+/* ─── セクション共通 ─── */
+.section {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sectionLabel {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ─── トラックリスト ─── */
+.trackList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trackItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+  position: relative;
+}
+
+.trackItem:hover {
+  background: var(--bg-glass);
+  border-color: var(--border-color);
+}
+
+.trackItem.selected {
+  background: rgba(124, 58, 237, 0.1);
+  border-color: rgba(124, 58, 237, 0.25);
+}
+
+/* 再生中のアニメーションインジケーター */
+.trackPlayingIcon {
+  font-size: 0.85rem;
+  width: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.trackFlag {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.trackInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.trackName {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trackSub {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+/* ─── ミキサースライダー ─── */
+.mixerSliders {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sliderRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sliderHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sliderLabel {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sliderVal {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 28px;
+  text-align: right;
+}
+
+.slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.sliderLofi {
+  background: linear-gradient(
+    to right,
+    rgba(124, 58, 237, 0.85) 0%,
+    rgba(124, 58, 237, 0.85) var(--pct, 65%),
+    rgba(255,255,255,0.08) var(--pct, 65%)
+  );
+}
+
+.sliderBird {
+  background: linear-gradient(
+    to right,
+    rgba(34, 197, 94, 0.75) 0%,
+    rgba(34, 197, 94, 0.75) var(--pct, 45%),
+    rgba(255,255,255,0.08) var(--pct, 45%)
+  );
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-primary);
+  cursor: pointer;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.5);
+  transition: transform var(--transition-fast);
+}
+
+.sliderLofi::-webkit-slider-thumb { background: var(--accent-primary); }
+.sliderBird::-webkit-slider-thumb { background: #22c55e; }
+
+.slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+/* 非表示 YouTube プレイヤー */
+.hiddenPlayers {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* フッター */
+.footer {
+  padding: 10px 16px;
+  margin-top: auto;
+}
+
+.footerText {
+  font-size: 0.67rem;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.6;
+}

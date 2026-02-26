@@ -1,0 +1,494 @@
+/* =============================================
+   ホームページスタイル（メインレイアウト）
+   ============================================= */
+
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.mainContent {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ヘッダー */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  background: rgba(9, 11, 20, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.headerTitle {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 検索バー */
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-full);
+  width: 220px;
+  transition: all var(--transition-fast);
+}
+
+.searchBar:focus-within {
+  border-color: var(--border-accent);
+  width: 280px;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+.searchIcon {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.searchInput {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+/* メインコンテンツエリア */
+.pageContent {
+  flex: 1;
+  padding: 32px;
+  max-width: 900px;
+}
+
+/* ヒーローセクション（部屋作成CTA） */
+.hero {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-xl);
+  padding: 28px 32px;
+  margin-bottom: 32px;
+  backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+  animation: fadeIn 0.5s ease forwards;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -10%;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.heroTitle {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+
+.heroSubtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.heroActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* セクションヘッダー */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.sectionTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sectionLink {
+  font-size: 0.82rem;
+  color: var(--text-accent);
+  font-weight: 500;
+  transition: color var(--transition-fast);
+}
+
+.sectionLink:hover {
+  color: var(--text-primary);
+}
+
+/* フィルタータブ */
+.filterTabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filterTab {
+  padding: 6px 16px;
+  border-radius: var(--border-radius-full);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-glass);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.filterTab:hover {
+  border-color: var(--border-accent);
+  color: var(--text-primary);
+}
+
+.filterTabActive {
+  background: rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.4);
+  color: var(--text-accent);
+}
+
+/* 部屋グリッド */
+.roomGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+@media (min-width: 640px) {
+  .roomGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* スケジュールイベントリスト */
+.eventList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 40px;
+}
+
+.eventCard {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-md);
+  backdrop-filter: blur(12px);
+  text-decoration: none;
+  animation: fadeIn 0.4s ease forwards;
+}
+
+.eventCard:hover {
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-accent);
+}
+
+.eventTime {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+  padding: 8px;
+  background: rgba(124, 58, 237, 0.1);
+  border-radius: var(--border-radius-md);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+}
+
+.eventTimeHour {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-accent);
+  line-height: 1;
+}
+
+.eventTimeDay {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.eventInfo {
+  flex: 1;
+  overflow: hidden;
+}
+
+.eventTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eventMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.eventHost {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.eventParticipants {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.eventJoinBtnJoined {
+  padding: 6px 14px;
+  border-radius: var(--border-radius-full);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: rgba(124, 58, 237, 0.15);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  color: var(--text-accent);
+  cursor: pointer;
+}
+
+.eventJoinBtnNotJoined {
+  padding: 6px 14px;
+  border-radius: var(--border-radius-full);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: var(--accent-gradient);
+  color: white;
+  cursor: pointer;
+  border: none;
+}
+
+/* クラブグリッド */
+.clubGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 40px;
+}
+
+@media (min-width: 640px) {
+  .clubGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.clubCardItem {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-md);
+  backdrop-filter: blur(12px);
+  text-decoration: none;
+  animation: fadeIn 0.4s ease forwards;
+}
+
+.clubCardItem:hover {
+  border-color: var(--border-accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-accent);
+}
+
+.clubCardImage {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--accent-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: white;
+}
+
+.clubCardName {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.clubCardDesc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.clubCardMembers {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.clubFollowBtnFollowing {
+  margin-top: auto;
+  padding: 5px 12px;
+  border-radius: var(--border-radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  color: var(--text-accent);
+  cursor: pointer;
+}
+
+.clubFollowBtnNotFollowing {
+  margin-top: auto;
+  padding: 5px 12px;
+  border-radius: var(--border-radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  background: var(--accent-gradient);
+  color: white;
+  cursor: pointer;
+  border: none;
+}
+
+/* レスポンシブ対応 */
+
+/* ハンバーガーボタン（PCでは非表示） */
+.hamburgerBtn {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.hamburgerBtn:hover {
+  background: var(--bg-glass-hover);
+  border-color: var(--border-accent);
+}
+
+/* 3本線 */
+.hamburgerBtn span {
+  display: block;
+  width: 16px;
+  height: 2px;
+  background: var(--text-secondary);
+  border-radius: 2px;
+  transition: all var(--transition-fast);
+}
+
+.hamburgerBtn:hover span {
+  background: var(--text-primary);
+}
+
+@media (max-width: 768px) {
+  .mainContent {
+    margin-left: 0;
+  }
+
+  /* モバイルではハンバーガーを表示 */
+  .hamburgerBtn {
+    display: flex;
+  }
+
+  .header {
+    padding: 0 16px;
+  }
+
+  .pageContent {
+    padding: 16px;
+  }
+
+  .hero {
+    padding: 20px;
+  }
+
+  .heroTitle {
+    font-size: 1.1rem;
+  }
+
+  /* 検索バーをモバイルで縮小 */
+  .searchBar {
+    width: 140px;
+  }
+
+  .searchBar:focus-within {
+    width: 180px;
+  }
+}
