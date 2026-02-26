@@ -31,8 +31,8 @@ const formatEventTime = (date: Date) => {
 }
 
 export default function HomePage() {
-  const [activeFilter,  setActiveFilter]  = useState('all')
-  const [sidebarOpen,   setSidebarOpen]   = useState(false)
+  const [activeFilter, setActiveFilter] = useState('all')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // フィルターに応じて表示する部屋を変更
   const filteredRooms = mockRooms
@@ -81,7 +81,7 @@ export default function HomePage() {
         <div className={styles.pageContent}>
           {/* ヒーローカード（ウェルカムメッセージ） */}
           <div className={styles.hero}>
-            <h2 className={styles.heroTitle}>おかえり、Hiroki 👋</h2>
+            <h2 className={styles.heroTitle}>おかえり、ゲストさん 👋</h2>
             <p className={styles.heroSubtitle}>
               今も誰かがだべってる。部屋を作って、気軽に話しかけてみよう。
             </p>
