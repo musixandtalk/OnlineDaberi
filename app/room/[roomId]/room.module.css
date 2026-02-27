@@ -110,6 +110,133 @@
   overflow-y: auto;
 }
 
+/* ── YouTube エリア（常時表示） ── */
+.youtubeArea {
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+/* URL 入力行 */
+.youtubeInputRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.youtubeInputRow input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: var(--text-primary);
+  font-size: 0.80rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.youtubeInputRow input:focus {
+  border-color: var(--border-accent);
+}
+
+.youtubePlayBtn {
+  background: var(--accent-gradient);
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: white;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.youtubeClearBtn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* 動画プレイヤーラッパー（16:9 維持） */
+.youtubePlayerWrap {
+  position: relative;
+  padding-top: 56.25%;
+}
+
+.youtubePlayerWrap iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* 音量コントロール */
+.youtubeVolumeRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-top: 1px solid var(--border-color);
+}
+
+.youtubeVolumeBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  line-height: 1;
+  padding: 0;
+}
+
+/* 同期バッジ */
+.youtubeSyncBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 999px;
+  font-size: 0.65rem;
+  color: #4ade80;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+/* 空プレースホルダー */
+.youtubePlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 0.80rem;
+}
+
+.youtubePlaceholderIcon {
+  font-size: 2rem;
+  opacity: 0.5;
+}
+
+
 /* スピーカーセクション */
 .speakersSection {
   margin-bottom: 32px;

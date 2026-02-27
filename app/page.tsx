@@ -36,6 +36,8 @@ export default function HomePage() {
   const router = useRouter()
   const [activeFilter, setActiveFilter] = useState('all')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  // 検索クエリ
+  const [searchQuery, setSearchQuery] = useState('')
 
   // 部屋一覧（モック＋作成した部屋）
   const [rooms, setRooms] = useState<Room[]>(mockRooms)
@@ -47,8 +49,20 @@ export default function HomePage() {
   const [newRoomTags, setNewRoomTags] = useState('')
   const [isPublic, setIsPublic] = useState(true)
 
-  // フィルターに応じて表示する部屋を変更
-  const filteredRooms = rooms
+  // フィルター + 検索で表示する部屋を絞り込む
+  const filteredRooms = rooms.filter(room => {
+    // 検索クエリがある場合はハイライトフィルター
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      return (
+        room.name.toLowerCase().includes(q) ||
+        room.description?.toLowerCase().includes(q) ||
+        room.hostName.toLowerCase().includes(q) ||
+        room.tags.some(t => t.toLowerCase().includes(q))
+      )
+    }
+    return true
+  })
 
   // 部屋を作成してルームページに遷移
   const handleCreateRoom = () => {
@@ -276,16 +290,7 @@ export default function HomePage() {
             <h1 className={styles.headerTitle}>はなしば</h1>
           </div>
           <div className={styles.headerRight}>
-            {/* 検索バー */}
-            <div className={styles.searchBar}>
-              <span className={styles.searchIcon}>🔍</span>
-              <input
-                type="text"
-                placeholder="部屋・クラブ・ユーザーを検索..."
-                className={styles.searchInput}
-              />
-            </div>
-            {/* 部屋作成ボタン — モーダルを開く */}
+            {/* PC用：部屋作成ボタン */}
             <button
               onClick={() => setShowCreateModal(true)}
               className="btn-primary"
@@ -305,17 +310,6 @@ export default function HomePage() {
               今も誰かがだべってる。部屋を作って、気軽に話しかけてみよう。
             </p>
 
-            {/* モバイル専用：検索バー（PCでは非表示） */}
-            <div className={styles.mobileSearch}>
-              <span className={styles.searchIcon}>🔍</span>
-              <input
-                type="text"
-                placeholder="部屋・クラブ・ユーザーを検索..."
-                className={styles.searchInput}
-                style={{ width: '100%' }}
-              />
-            </div>
-
             <div className={styles.heroActions}>
               <button
                 className="btn-primary"
@@ -324,6 +318,7 @@ export default function HomePage() {
               <button className="btn-secondary">📅 だべり予定を入れる</button>
             </div>
           </div>
+
 
 
           {/* フィルタータブ */}
@@ -350,6 +345,54 @@ export default function HomePage() {
                 すべて見る →
               </Link>
             </div>
+
+            {/* 検索バー（ライブ部屋の直上） */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '9px 14px',
+              background: 'var(--bg-glass)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--border-radius-full)',
+              marginBottom: 16,
+              transition: 'border-color 0.15s, box-shadow 0.15s',
+            }}
+              onFocus={() => { }} // focus 時にスタイル変えたい場合
+            >
+              <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>🔍</span>
+              <input
+                type="text"
+                placeholder="部屋・ホスト名・タグで検索..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{
+                  flex: 1,
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.88rem',
+                  outline: 'none',
+                }}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.85rem', flexShrink: 0 }}
+                  aria-label="検索をクリア"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* 検索結果なし */}
+            {filteredRooms.length === 0 && (
+              <div className="empty-state">
+                <span className="empty-state-icon">🔍</span>
+                <p className="empty-state-text">「{searchQuery}」に一致する部屋が見つかりませんでした</p>
+              </div>
+            )}
 
             <div className={styles.roomGrid}>
               {filteredRooms.map((room) => (

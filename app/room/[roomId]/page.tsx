@@ -457,8 +457,19 @@ export default function RoomPage() {
   // YouTube 埋め込み状態
   const [youtubeInput, setYoutubeInput] = useState('')
   const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null)
-  const [youtubeVolume, setYoutubeVolume] = useState(80) // 0～100
+  const [youtubeVolume, setYoutubeVolume] = useState(80)
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  // タブ間・ウィンドウ間の同期用 BroadcastChannel
+  const channelRef = useRef<BroadcastChannel | null>(null)
+
+  // URL から動画 ID を抽出して設定 + ブロードキャスト
+  const applyYoutubeUrl = (input: string) => {
+    const match = input.match(/(?:youtu\.be\/|watch\?v=|embed\/|shorts\/|live\/)?([\w-]{11})/)
+    const videoId = match ? match[1] : null
+    setYoutubeVideoId(videoId)
+    channelRef.current?.postMessage({ type: 'yt-sync', videoId })
+    setYoutubeInput('')
+  }
 
   // iframeに対して音量を送信（YouTube IFrame API の postMessageを利用）
   const sendYoutubeVolume = (vol: number) => {
@@ -471,6 +482,18 @@ export default function RoomPage() {
   // LiveKit トークンの状態
   const [livekitToken, setLivekitToken] = useState<string | null>(null)
   const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL ?? ''
+
+  // BroadcastChannel をセットアップ（同じルームIDのタブ間で同期）
+  useEffect(() => {
+    const ch = new BroadcastChannel(`ondabe-room-${roomId}`)
+    channelRef.current = ch
+    ch.onmessage = (e) => {
+      if (e.data?.type === 'yt-sync') {
+        setYoutubeVideoId(e.data.videoId ?? null)
+      }
+    }
+    return () => ch.close()
+  }, [roomId])
 
   // デモ用：匿名ユーザーとして表示
   const isGuest = true
@@ -655,7 +678,63 @@ export default function RoomPage() {
         <div className={styles.roomContent}>
           {/* 空間レイアウトエリア */}
           <div className={styles.spatialArea}>
+            {/* YouTube プレイヤー（常時表示） */}
+            <div className={styles.youtubeArea}>
+              {/* URL 入力行 */}
+              <div className={styles.youtubeInputRow}>
+                <span style={{ fontSize: '0.9rem', flexShrink: 0 }}>📺</span>
+                <input
+                  type="text"
+                  value={youtubeInput}
+                  onChange={e => setYoutubeInput(e.target.value)}
+                  placeholder="YouTube URL を貼り付けて Enter..."
+                  onKeyDown={e => { if (e.key === 'Enter') applyYoutubeUrl(youtubeInput) }}
+                />
+                <button className={styles.youtubePlayBtn} onClick={() => applyYoutubeUrl(youtubeInput)}>▶ 再生</button>
+                {youtubeVideoId && (
+                  <button className={styles.youtubeClearBtn} onClick={() => { setYoutubeVideoId(null); channelRef.current?.postMessage({ type: 'yt-sync', videoId: null }) }}>✕</button>
+                )}
+                {youtubeVideoId && <span className={styles.youtubeSyncBadge}>🟢 同期中</span>}
+              </div>
+
+              {/* プレイヤー or プレースホルダー */}
+              {youtubeVideoId ? (
+                <>
+                  <div className={styles.youtubePlayerWrap}>
+                    <iframe
+                      ref={iframeRef}
+                      src={`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&enablejsapi=1`}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      title="YouTube 動画プレイヤー"
+                    />
+                  </div>
+                  {/* 音量コントロール */}
+                  <div className={styles.youtubeVolumeRow}>
+                    <button
+                      className={styles.youtubeVolumeBtn}
+                      onClick={() => { const v = youtubeVolume === 0 ? 80 : 0; setYoutubeVolume(v); sendYoutubeVolume(v) }}
+                    >
+                      {youtubeVolume === 0 ? '🔇' : youtubeVolume < 50 ? '🔉' : '🔊'}
+                    </button>
+                    <input
+                      type="range" min={0} max={100} value={youtubeVolume}
+                      onChange={e => { const v = Number(e.target.value); setYoutubeVolume(v); sendYoutubeVolume(v) }}
+                      style={{ flex: 1, accentColor: '#818cf8', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', width: 32, textAlign: 'right' }}>{youtubeVolume}%</span>
+                  </div>
+                </>
+              ) : (
+                <div className={styles.youtubePlaceholder}>
+                  <span className={styles.youtubePlaceholderIcon}>📺</span>
+                  <span>URL を入力すると全員に同期されます</span>
+                </div>
+              )}
+            </div>
+
             {/* スピーカーゾーン */}
+
             <section className={styles.speakersSection}>
               <div className={styles.zoneTitleRow}>
                 <span className={styles.zoneTitle}>🎙️ スピーカー</span>
@@ -739,12 +818,6 @@ export default function RoomPage() {
               >
                 🎵 BGM
               </button>
-              <button
-                className={`${styles.sidePanelTab} ${activeTab === 'youtube' ? styles.active : ''}`}
-                onClick={() => setActiveTab('youtube')}
-              >
-                📺 YouTube
-              </button>
             </div>
 
             <div className={styles.sidePanelContent}>
@@ -760,150 +833,6 @@ export default function RoomPage() {
                       <p className={styles.chatMessageText}>{msg.text}</p>
                     </div>
                   ))}
-                </div>
-              ) : activeTab === 'youtube' ? (
-                /* YouTube 埋め込みタブ */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    YouTube の URL または動画 ID を入力してください
-                  </p>
-                  {/* URL 入力フォーム */}
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <input
-                      type="text"
-                      value={youtubeInput}
-                      onChange={e => setYoutubeInput(e.target.value)}
-                      placeholder="https://youtube.com/watch?v=..."
-                      style={{
-                        flex: 1,
-                        background: 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(255,255,255,0.12)',
-                        borderRadius: 8,
-                        padding: '7px 10px',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.78rem',
-                        outline: 'none',
-                      }}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          // URL から動画 ID を抽出
-                          const match = youtubeInput.match(
-                            /(?:youtu\.be\/|watch\?v=|embed\/)([\w-]{11})/
-                          )
-                          const videoId = match ? match[1] : youtubeInput.trim()
-                          setYoutubeVideoId(videoId.length === 11 ? videoId : null)
-                        }
-                      }}
-                    />
-                    <button
-                      onClick={() => {
-                        const match = youtubeInput.match(
-                          /(?:youtu\.be\/|watch\?v=|embed\/)([\w-]{11})/
-                        )
-                        const videoId = match ? match[1] : youtubeInput.trim()
-                        setYoutubeVideoId(videoId.length === 11 ? videoId : null)
-                      }}
-                      style={{
-                        background: 'var(--accent-gradient)',
-                        border: 'none',
-                        borderRadius: 8,
-                        padding: '7px 12px',
-                        color: 'white',
-                        fontSize: '0.78rem',
-                        cursor: 'pointer',
-                        flexShrink: 0,
-                      }}
-                    >
-                      ▶ 再生
-                    </button>
-                  </div>
-                  {/* YouTube プレイヤー */}
-                  {youtubeVideoId ? (
-                    <>
-                      <div style={{ position: 'relative', paddingTop: '56.25%', borderRadius: 10, overflow: 'hidden' }}>
-                        <iframe
-                          ref={iframeRef}
-                          src={`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&enablejsapi=1`}
-                          style={{
-                            position: 'absolute',
-                            top: 0, left: 0,
-                            width: '100%', height: '100%',
-                            border: 'none',
-                          }}
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                          title="YouTube 動画プレイヤー"
-                        />
-                      </div>
-
-                      {/* 音量スライダー */}
-                      <div style={{
-                        display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '10px 14px',
-                        background: 'rgba(255,255,255,0.04)',
-                        borderRadius: 10,
-                        border: '1px solid rgba(255,255,255,0.08)',
-                      }}>
-                        <button
-                          onClick={() => {
-                            const newVol = youtubeVolume === 0 ? 80 : 0
-                            setYoutubeVolume(newVol)
-                            sendYoutubeVolume(newVol)
-                          }}
-                          style={{
-                            background: 'none', border: 'none',
-                            cursor: 'pointer', fontSize: '1.1rem',
-                            flexShrink: 0, lineHeight: 1,
-                          }}
-                          title={youtubeVolume === 0 ? 'ミュート解除' : 'ミュート'}
-                        >
-                          {youtubeVolume === 0 ? '🔇' : youtubeVolume < 50 ? '🔉' : '🔊'}
-                        </button>
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          value={youtubeVolume}
-                          onChange={e => {
-                            const vol = Number(e.target.value)
-                            setYoutubeVolume(vol)
-                            sendYoutubeVolume(vol)
-                          }}
-                          style={{ flex: 1, accentColor: '#818cf8', cursor: 'pointer' }}
-                        />
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', width: 32, textAlign: 'right' }}>
-                          {youtubeVolume}%
-                        </span>
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      height: 150, background: 'rgba(255,255,255,0.03)',
-                      borderRadius: 10, border: '1px dashed rgba(255,255,255,0.1)',
-                      color: 'var(--text-muted)', fontSize: '0.82rem', flexDirection: 'column', gap: 8
-                    }}>
-                      <span style={{ fontSize: '2rem' }}>📺</span>
-                      <span>URL を入力して Enter を押してください</span>
-                    </div>
-                  )}
-                  {/* クリアボタン */}
-                  {youtubeVideoId && (
-                    <button
-                      onClick={() => { setYoutubeVideoId(null); setYoutubeInput('') }}
-                      style={{
-                        background: 'transparent',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: 8,
-                        padding: '6px',
-                        color: 'var(--text-muted)',
-                        fontSize: '0.75rem',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      ✕ 動画をクリア
-                    </button>
-                  )}
                 </div>
               ) : activeTab === 'bgm' ? (
                 /* BGMタブ — ルーム内専用 */

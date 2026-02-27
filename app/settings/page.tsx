@@ -109,19 +109,33 @@ export default function SettingsPage() {
                                     placeholder="username"
                                 />
                             </div>
-                            <div className={styles.row}>
+                            <div className={styles.row} style={{ alignItems: 'flex-start' }}>
                                 <div>
                                     <div className={styles.rowLabel}>自己紹介</div>
-                                    <div className={styles.rowSub}>プロフィールに表示されます</div>
+                                    <div className={styles.rowSub}>プロフィールに表示されます（5,000文字まで）</div>
                                 </div>
-                                <input
-                                    className={styles.textInput}
-                                    value={bio}
-                                    onChange={e => setBio(e.target.value)}
-                                    maxLength={80}
-                                    placeholder="自己紹介..."
-                                />
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, maxWidth: 280 }}>
+                                    <textarea
+                                        className={styles.textInput}
+                                        value={bio}
+                                        onChange={e => setBio(e.target.value)}
+                                        maxLength={5000}
+                                        placeholder="自己紹介を入力..."
+                                        rows={4}
+                                        style={{
+                                            width: '100%',
+                                            resize: 'vertical',
+                                            lineHeight: 1.6,
+                                            fontFamily: 'inherit',
+                                            minHeight: 80,
+                                        }}
+                                    />
+                                    <span style={{ fontSize: '0.7rem', color: bio.length > 4800 ? '#f87171' : 'var(--text-muted)', textAlign: 'right' }}>
+                                        {bio.length.toLocaleString()} / 5,000
+                                    </span>
+                                </div>
                             </div>
+
                         </div>
 
                         {/* ─── 通知設定 ─── */}
