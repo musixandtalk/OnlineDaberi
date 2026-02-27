@@ -1,0 +1,292 @@
+/* プロフィールページ */
+.page {
+    flex: 1;
+    max-width: 720px;
+    padding: 0 32px 40px;
+}
+
+@media (max-width: 768px) {
+    .page {
+        padding: 0 16px 32px;
+    }
+}
+
+/* バナー */
+.banner {
+    height: 160px;
+    background: linear-gradient(135deg, #3b1fa8 0%, #6d28d9 40%, #1d4ed8 100%);
+    border-radius: 0 0 24px 24px;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 0;
+}
+
+.banner::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 20% 50%, rgba(167, 139, 250, 0.25) 0%, transparent 60%),
+        radial-gradient(circle at 80% 30%, rgba(96, 165, 250, 0.2) 0%, transparent 60%);
+}
+
+@media (max-width: 768px) {
+    .banner {
+        height: 110px;
+    }
+}
+
+/* プロフィールヘッダー */
+.profileHeader {
+    position: relative;
+    padding: 0 28px;
+    margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+    .profileHeader {
+        padding: 0 16px;
+    }
+}
+
+/* アバター */
+.avatarWrap {
+    position: absolute;
+    top: -52px;
+    left: 28px;
+}
+
+@media (max-width: 768px) {
+    .avatarWrap {
+        left: 16px;
+        top: -44px;
+    }
+}
+
+.avatar {
+    width: 104px;
+    height: 104px;
+    border-radius: 50%;
+    background: var(--accent-gradient);
+    border: 4px solid var(--bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: white;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+@media (max-width: 768px) {
+    .avatar {
+        width: 80px;
+        height: 80px;
+        font-size: 1.6rem;
+    }
+}
+
+/* フォローボタンエリア */
+.profileActions {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 14px;
+    gap: 8px;
+}
+
+/* ユーザー情報 */
+.profileInfo {
+    margin-top: 60px;
+}
+
+@media (max-width: 768px) {
+    .profileInfo {
+        margin-top: 48px;
+    }
+}
+
+.displayName {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    margin-bottom: 2px;
+}
+
+.handle {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.bio {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    margin-bottom: 16px;
+    max-width: 500px;
+}
+
+/* フォロー数 */
+.stats {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.statItem {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+}
+
+.statNum {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.statLabel {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+/* タグ */
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 28px;
+}
+
+.tag {
+    padding: 4px 12px;
+    background: rgba(124, 58, 237, 0.1);
+    border: 1px solid rgba(124, 58, 237, 0.2);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    color: var(--text-accent);
+    font-weight: 500;
+}
+
+/* セクション */
+.section {
+    margin-bottom: 28px;
+}
+
+.sectionTitle {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* クラブグリッド */
+.clubGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+@media (min-width: 500px) {
+    .clubGrid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.clubCard {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    transition: all 0.2s;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.clubCard:hover {
+    border-color: var(--border-accent);
+    transform: translateY(-2px);
+}
+
+.clubAvatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--accent-gradient);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: white;
+    flex-shrink: 0;
+}
+
+.clubName {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 最近の部屋 */
+.roomList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.roomItem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    text-decoration: none;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.roomItem:hover {
+    border-color: var(--border-accent);
+    box-shadow: var(--shadow-accent);
+}
+
+.roomIcon {
+    font-size: 1.4rem;
+    flex-shrink: 0;
+}
+
+.roomInfo {
+    flex: 1;
+    min-width: 0;
+}
+
+.roomName {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.roomMeta {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}

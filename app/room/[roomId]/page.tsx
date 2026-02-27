@@ -18,15 +18,17 @@ import UpgradeBanner from '@/components/UpgradeBanner/UpgradeBanner'
 import MicrophoneSelector from '@/components/MicrophoneSelector/MicrophoneSelector'
 import styles from './room.module.css'
 
-// リアクション定義（絵文字・ラベル・効果音の周波数）
-const REACTIONS = [
-  { emoji: '👏', label: '拍手', freq: 880, duration: 0.3 },
-  { emoji: '😂', label: '笑い', freq: 440, duration: 0.2 },
-  { emoji: '❤️', label: 'ハート', freq: 660, duration: 0.25 },
-  { emoji: '🔥', label: 'Fire', freq: 330, duration: 0.4 },
-  { emoji: '🎉', label: '祝', freq: 1046, duration: 0.3 },
-  { emoji: '💯', label: '最高', freq: 523, duration: 0.2 },
+// リアクション定義（各リアクション専用の音色関数を持つ）
+// playSound は後の専用関数を参照するため、REACTIONS は定数として後で定義
+const REACTION_DEFS = [
+  { emoji: '👏', label: '拍手', key: 'clap' },
+  { emoji: '😂', label: '笑い', key: 'laugh' },
+  { emoji: '❤️', label: 'ハート', key: 'heart' },
+  { emoji: '🔥', label: 'Fire', key: 'fire' },
+  { emoji: '🎉', label: '祝', key: 'party' },
+  { emoji: '💯', label: '最高', key: 'coin' },
 ]
+
 
 // 名前のイニシャルを返すユーティリティ
 const getInitials = (name: string) =>
@@ -227,29 +229,142 @@ function RemoteVolumeControl({ participantIdentity, displayName }: { participant
   )
 }
 
-// Web Audio API を使ったリアクション効果音を再生する関数
-function playReactionSound(freq: number, duration: number) {
-  try {
-    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
-    const oscillator = ctx.createOscillator()
-    const gainNode = ctx.createGain()
-
-    oscillator.connect(gainNode)
-    gainNode.connect(ctx.destination)
-
-    oscillator.frequency.setValueAtTime(freq, ctx.currentTime)
-    oscillator.type = 'sine'
-
-    // フェードアウトして自然な音に
-    gainNode.gain.setValueAtTime(0.3, ctx.currentTime)
-    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
-
-    oscillator.start(ctx.currentTime)
-    oscillator.stop(ctx.currentTime + duration)
-  } catch {
-    // AudioContext が使えない環境では無視
-  }
+// AudioContext ヘルパー
+function getAudioCtx() {
+  return new (window.AudioContext ||
+    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
 }
+function makeOscillator(
+  ctx: AudioContext,
+  type: OscillatorType,
+  freq: number,
+  gain = 0.25,
+): { osc: OscillatorNode; gn: GainNode } {
+  const osc = ctx.createOscillator()
+  const gn = ctx.createGain()
+  osc.type = type
+  osc.frequency.setValueAtTime(freq, ctx.currentTime)
+  gn.gain.setValueAtTime(gain, ctx.currentTime)
+  osc.connect(gn)
+  gn.connect(ctx.destination)
+  return { osc, gn }
+}
+
+// 👏 拍手：ランダムノイズの3連クラップ
+function playClap() {
+  try {
+    const ctx = getAudioCtx()
+      ;[0, 0.13, 0.26].forEach(offset => {
+        const buf = ctx.createBuffer(1, ctx.sampleRate * 0.07, ctx.sampleRate)
+        const data = buf.getChannelData(0)
+        for (let i = 0; i < data.length; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.022))
+        }
+        const src = ctx.createBufferSource()
+        const gn = ctx.createGain()
+        src.buffer = buf
+        gn.gain.setValueAtTime(0.65, ctx.currentTime + offset)
+        gn.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + offset + 0.09)
+        src.connect(gn)
+        gn.connect(ctx.destination)
+        src.start(ctx.currentTime + offset)
+      })
+  } catch { /* 無視 */ }
+}
+
+// 😂 笑い：コミカルな上昇→下降グリッサンド
+function playLaugh() {
+  try {
+    const ctx = getAudioCtx()
+    const { osc, gn } = makeOscillator(ctx, 'sine', 300, 0.2)
+    osc.frequency.linearRampToValueAtTime(720, ctx.currentTime + 0.14)
+    osc.frequency.linearRampToValueAtTime(490, ctx.currentTime + 0.30)
+    gn.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.34)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.35)
+  } catch { /* 無視 */ }
+}
+
+// ❤️ ハート：温かい C-E-G 和音（アルペジオ）
+function playHeart() {
+  try {
+    const ctx = getAudioCtx()
+      ;[523.25, 659.25, 783.99].forEach((freq, i) => {
+        const { osc, gn } = makeOscillator(ctx, 'sine', freq, 0.16)
+        osc.start(ctx.currentTime + i * 0.05)
+        gn.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6)
+        osc.stop(ctx.currentTime + 0.62)
+      })
+  } catch { /* 無視 */ }
+}
+
+// 🔥 Fire：4連スネアロール
+function playFire() {
+  try {
+    const ctx = getAudioCtx()
+      ;[0, 0.06, 0.13, 0.21].forEach((offset, i) => {
+        const buf = ctx.createBuffer(1, ctx.sampleRate * 0.04, ctx.sampleRate)
+        const data = buf.getChannelData(0)
+        for (let j = 0; j < data.length; j++) {
+          data[j] = (Math.random() * 2 - 1) * Math.exp(-j / (ctx.sampleRate * 0.012))
+        }
+        const src = ctx.createBufferSource()
+        const gn = ctx.createGain()
+        src.buffer = buf
+        const vol = 0.55 - i * 0.08
+        gn.gain.setValueAtTime(vol, ctx.currentTime + offset)
+        src.connect(gn)
+        gn.connect(ctx.destination)
+        src.start(ctx.currentTime + offset)
+      })
+  } catch { /* 無視 */ }
+}
+
+// 🎉 祝：上昇ファンファーレ（C5→E5→G5→C6）
+function playParty() {
+  try {
+    const ctx = getAudioCtx()
+    const notes = [
+      { freq: 523.25, t: 0, dur: 0.11 },
+      { freq: 659.25, t: 0.10, dur: 0.11 },
+      { freq: 783.99, t: 0.20, dur: 0.11 },
+      { freq: 1046.5, t: 0.30, dur: 0.28 },
+    ]
+    notes.forEach(({ freq, t, dur }) => {
+      const { osc, gn } = makeOscillator(ctx, 'square', freq, 0.16)
+      osc.start(ctx.currentTime + t)
+      gn.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + dur)
+      osc.stop(ctx.currentTime + t + dur + 0.02)
+    })
+  } catch { /* 無視 */ }
+}
+
+// 💯 最高：ゲームのコイン獲得音（B5→E6）
+function playCoin() {
+  try {
+    const ctx = getAudioCtx()
+    const { osc, gn } = makeOscillator(ctx, 'square', 988, 0.18)
+    osc.frequency.setValueAtTime(988, ctx.currentTime)
+    osc.frequency.setValueAtTime(1319, ctx.currentTime + 0.08)
+    gn.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.23)
+  } catch { /* 無視 */ }
+}
+
+// キーで音を再生するディスパッチャー
+function dispatchSound(key: string) {
+  const map: Record<string, () => void> = {
+    clap: playClap,
+    laugh: playLaugh,
+    heart: playHeart,
+    fire: playFire,
+    party: playParty,
+    coin: playCoin,
+  }
+  map[key]?.()
+}
+
 
 // リアクションパネルコンポーネント
 function ReactionPanel({ onClose }: { onClose: () => void }) {
@@ -269,12 +384,12 @@ function ReactionPanel({ onClose }: { onClose: () => void }) {
       animation: 'fadeUp 0.2s ease',
       zIndex: 100,
     }}>
-      {REACTIONS.map(r => (
+      {REACTION_DEFS.map(r => (
         <button
           key={r.emoji}
           title={r.label}
           onClick={() => {
-            playReactionSound(r.freq, r.duration)
+            dispatchSound(r.key)  // 専用音色を再生
             onClose()
           }}
           style={{
@@ -295,6 +410,7 @@ function ReactionPanel({ onClose }: { onClose: () => void }) {
     </div>
   )
 }
+
 
 export default function RoomPage() {
   const params = useParams()
@@ -583,6 +699,16 @@ export default function RoomPage() {
               </div>
             </section>
           </div>
+
+          {/* モバイル専用：右下フローティングボタン（ドロワーを開く） */}
+          <button
+            className={styles.floatingPanelBtn}
+            onClick={() => setDrawerOpen(true)}
+            title="チャット・YouTube・参加者を開く"
+            aria-label="パネルを開く"
+          >
+            {activeTab === 'youtube' ? '📺' : activeTab === 'participants' ? '👥' : '💬'}
+          </button>
 
           {/* モバイル用ドロワーオーバーレイ（背景タップで閉じる） */}
           {drawerOpen && (

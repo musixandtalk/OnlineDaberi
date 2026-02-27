@@ -27,18 +27,18 @@ interface YTPlayer {
 
 // ─── キュレーション済みデフォルト ─────────────────
 const LOFI_TRACKS: Track[] = [
-  { id: 'jfKfPfyJRdk', name: 'Lofi Girl — Study Beats',   sub: '24/7 ライブ',   flag: '📚' },
+  { id: 'jfKfPfyJRdk', name: 'Lofi Girl — Study Beats', sub: '24/7 ライブ', flag: '📚' },
   { id: '5qap5aO4i9A', name: 'Lofi Girl — Sleep / Chill', sub: 'まったりモード', flag: '🌙' },
-  { id: 'DWcJFNfaw9c', name: 'Coffee Shop Radio',          sub: 'カフェBGM',     flag: '☕' },
-  { id: 'kgx4WGK0oNU', name: 'Chillhop Radio',             sub: 'Jazzy Lofi',    flag: '🐾' },
-  { id: '7NOSDKb0HlU', name: 'Studio Ghibli Piano',        sub: 'ジブリBGM',     flag: '🌿' },
+  { id: 'DWcJFNfaw9c', name: 'Coffee Shop Radio', sub: 'カフェBGM', flag: '☕' },
+  { id: 'kgx4WGK0oNU', name: 'Chillhop Radio', sub: 'Jazzy Lofi', flag: '🐾' },
+  { id: '7NOSDKb0HlU', name: 'Studio Ghibli Piano', sub: 'ジブリBGM', flag: '🌿' },
 ]
 
 const NATURE_TRACKS: Track[] = [
-  { id: 'y1bXO_H_MBQ', name: '森の鳥の声',        sub: '朝の森アンビエント', flag: '🐦' },
-  { id: 'xNN7iTA57jM', name: '雨と鳥の声',        sub: 'レインフォレスト',   flag: '🌧️' },
-  { id: 'eKFTSSKCzWA', name: '川のせせらぎ + 鳥', sub: '自然のサウンド',     flag: '🏞️' },
-  { id: 'lFcSrYw2tYU', name: '海辺の鳥の声',      sub: 'オーシャンアンビ',   flag: '🌊' },
+  { id: 'y1bXO_H_MBQ', name: '森の鳥の声', sub: '朝の森アンビエント', flag: '🐦' },
+  { id: 'xNN7iTA57jM', name: '雨と鳥の声', sub: 'レインフォレスト', flag: '🌧️' },
+  { id: 'eKFTSSKCzWA', name: '川のせせらぎ + 鳥', sub: '自然のサウンド', flag: '🏞️' },
+  { id: 'lFcSrYw2tYU', name: '海辺の鳥の声', sub: 'オーシャンアンビ', flag: '🌊' },
 ]
 
 const BAR_COUNT = 18
@@ -85,25 +85,25 @@ function loadYTApi(): Promise<void> {
 
 // ─── コンポーネント ───────────────────────────────
 export default function BGMPlayer() {
-  const [isPlaying,  setIsPlaying]  = useState(false)
-  const [apiReady,   setApiReady]   = useState(false)
-  const [lofiTrack,  setLofiTrack]  = useState(LOFI_TRACKS[0])
-  const [natureTrack,setNatureTrack]= useState(NATURE_TRACKS[0])
-  const [lofiVol,    setLofiVol]    = useState(65)
-  const [natureVol,  setNatureVol]  = useState(45)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [apiReady, setApiReady] = useState(false)
+  const [lofiTrack, setLofiTrack] = useState(LOFI_TRACKS[0])
+  const [natureTrack, setNatureTrack] = useState(NATURE_TRACKS[0])
+  const [lofiVol, setLofiVol] = useState(65)
+  const [natureVol, setNatureVol] = useState(45)
 
   // URL入力フィールド
-  const [lofiUrl,    setLofiUrl]    = useState('')
-  const [lofiErr,    setLofiErr]    = useState('')
-  const [natureUrl,  setNatureUrl]  = useState('')
-  const [natureErr,  setNatureErr]  = useState('')
+  const [lofiUrl, setLofiUrl] = useState('')
+  const [lofiErr, setLofiErr] = useState('')
+  const [natureUrl, setNatureUrl] = useState('')
+  const [natureErr, setNatureErr] = useState('')
 
   // 波形バー
   const [waveBars, setWaveBars] = useState<number[]>(Array(BAR_COUNT).fill(0))
 
-  const lofiPlayerRef   = useRef<YTPlayer | null>(null)
+  const lofiPlayerRef = useRef<YTPlayer | null>(null)
   const naturePlayerRef = useRef<YTPlayer | null>(null)
-  const waveTimerRef    = useRef<ReturnType<typeof setInterval> | null>(null)
+  const waveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     loadYTApi().then(() => setApiReady(true))
@@ -165,7 +165,7 @@ export default function BGMPlayer() {
     const id = extractVideoId(raw)
     if (!id) {
       if (type === 'lofi') setLofiErr('有効なYouTube URLを入力してください')
-      else                 setNatureErr('有効なYouTube URLを入力してください')
+      else setNatureErr('有効なYouTube URLを入力してください')
       return
     }
     const track: Track = { id, name: raw.length > 36 ? raw.slice(0, 36) + '…' : raw, sub: 'カスタムURL', flag: '🔗' }
@@ -192,7 +192,7 @@ export default function BGMPlayer() {
   }, [lofiVol, natureVol])
 
   // 音量変更
-  const handleLofiVol   = (v: number) => { setLofiVol(v);   lofiPlayerRef.current?.setVolume(v) }
+  const handleLofiVol = (v: number) => { setLofiVol(v); lofiPlayerRef.current?.setVolume(v) }
   const handleNatureVol = (v: number) => { setNatureVol(v); naturePlayerRef.current?.setVolume(v) }
 
   return (
@@ -240,15 +240,18 @@ export default function BGMPlayer() {
             style={{ '--pct': `${lofiVol}%` } as React.CSSProperties}
             onChange={e => handleLofiVol(Number(e.target.value))} />
         </div>
-        <div className={styles.sliderRow}>
-          <div className={styles.sliderHeader}>
-            <span className={styles.sliderLabel}>🐦 自然音</span>
-            <span className={styles.sliderVal}>{natureVol}%</span>
+        {/* 🐦 自然音スライダー（一時非表示） */}
+        <div style={{ display: 'none' }}>
+          <div className={styles.sliderRow}>
+            <div className={styles.sliderHeader}>
+              <span className={styles.sliderLabel}>🐦 自然音</span>
+              <span className={styles.sliderVal}>{natureVol}%</span>
+            </div>
+            <input type="range" min={0} max={100} value={natureVol}
+              className={`${styles.slider} ${styles.sliderBird}`}
+              style={{ '--pct': `${natureVol}%` } as React.CSSProperties}
+              onChange={e => handleNatureVol(Number(e.target.value))} />
           </div>
-          <input type="range" min={0} max={100} value={natureVol}
-            className={`${styles.slider} ${styles.sliderBird}`}
-            style={{ '--pct': `${natureVol}%` } as React.CSSProperties}
-            onChange={e => handleNatureVol(Number(e.target.value))} />
         </div>
       </div>
 
@@ -292,40 +295,44 @@ export default function BGMPlayer() {
           </div>
         </div>
 
-        {/* 自然音 URL入力 */}
-        <div className={styles.inputPanel}>
-          <p className={styles.inputPanelLabel}>🌿 カスタム自然音 URL</p>
-          <div className={styles.urlRow}>
-            <input
-              type="text"
-              placeholder="https://www.youtube.com/watch?v=..."
-              value={natureUrl}
-              onChange={e => { setNatureUrl(e.target.value); setNatureErr('') }}
-              onKeyDown={e => { if (e.key === 'Enter') applyUrl(natureUrl, 'nature') }}
-              className={styles.urlInput}
-            />
-            <button className={styles.urlBtn} onClick={() => applyUrl(natureUrl, 'nature')} title="セット">▶</button>
+        {/* 🌿 自然音 URL入力（一時非表示） */}
+        <div style={{ display: 'none' }}>
+          <div className={styles.inputPanel}>
+            <p className={styles.inputPanelLabel}>🌿 カスタム自然音 URL</p>
+            <div className={styles.urlRow}>
+              <input
+                type="text"
+                placeholder="https://www.youtube.com/watch?v=..."
+                value={natureUrl}
+                onChange={e => { setNatureUrl(e.target.value); setNatureErr('') }}
+                onKeyDown={e => { if (e.key === 'Enter') applyUrl(natureUrl, 'nature') }}
+                className={styles.urlInput}
+              />
+              <button className={styles.urlBtn} onClick={() => applyUrl(natureUrl, 'nature')} title="セット">▶</button>
+            </div>
+            {natureErr && <p className={styles.urlErr}>⚠️ {natureErr}</p>}
           </div>
-          {natureErr && <p className={styles.urlErr}>⚠️ {natureErr}</p>}
         </div>
 
-        {/* 自然音トラック一覧 */}
-        <div className={styles.section}>
-          <p className={styles.sectionLabel}>🌿 おすすめ自然音</p>
-          <div className={styles.trackList}>
-            {NATURE_TRACKS.map(t => (
-              <div key={t.id}
-                className={`${styles.trackItem} ${natureTrack.id === t.id ? styles.selected : ''}`}
-                onClick={() => selectTrack(t, 'nature')}
-              >
-                <span className={styles.trackPlayingIcon}>{natureTrack.id === t.id && isPlaying ? '🎵' : ''}</span>
-                <span className={styles.trackFlag}>{t.flag}</span>
-                <div className={styles.trackInfo}>
-                  <p className={styles.trackName}>{t.name}</p>
-                  <p className={styles.trackSub}>{t.sub}</p>
+        {/* 🌿 自然音トラック一覧（一時非表示） */}
+        <div style={{ display: 'none' }}>
+          <div className={styles.section}>
+            <p className={styles.sectionLabel}>🌿 おすすめ自然音</p>
+            <div className={styles.trackList}>
+              {NATURE_TRACKS.map(t => (
+                <div key={t.id}
+                  className={`${styles.trackItem} ${natureTrack.id === t.id ? styles.selected : ''}`}
+                  onClick={() => selectTrack(t, 'nature')}
+                >
+                  <span className={styles.trackPlayingIcon}>{natureTrack.id === t.id && isPlaying ? '🎵' : ''}</span>
+                  <span className={styles.trackFlag}>{t.flag}</span>
+                  <div className={styles.trackInfo}>
+                    <p className={styles.trackName}>{t.name}</p>
+                    <p className={styles.trackSub}>{t.sub}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
 
