@@ -139,6 +139,11 @@
   flex-wrap: wrap;
 }
 
+/* モバイル専用検索バー（PCでは非表示） */
+.mobileSearch {
+  display: none;
+}
+
 /* セクションヘッダー */
 .sectionHeader {
   display: flex;
@@ -384,6 +389,7 @@
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -419,7 +425,9 @@
   border: none;
 }
 
-/* レスポンシブ対応 */
+/* =============================================
+   レスポンシブ対応
+   ============================================= */
 
 /* ハンバーガーボタン（PCでは非表示） */
 .hamburgerBtn {
@@ -457,38 +465,143 @@
   background: var(--text-primary);
 }
 
+/* =============================================
+   モバイル（スマホ）対応
+   ============================================= */
 @media (max-width: 768px) {
+
+  /* サイドバーのマージンをリセット */
   .mainContent {
     margin-left: 0;
   }
 
-  /* モバイルではハンバーガーを表示 */
+  /* ハンバーガーを表示 */
   .hamburgerBtn {
     display: flex;
   }
 
+  /* ヘッダーをシンプルに：タイトルとハンバーガーのみ */
   .header {
     padding: 0 16px;
   }
 
-  .pageContent {
-    padding: 16px;
+  /* 検索バーと「部屋を作る」ボタンをヘッダーから隠す */
+  .headerRight {
+    display: none;
   }
 
+  /* ページコンテンツのパディングを縮小 */
+  .pageContent {
+    padding: 14px;
+  }
+
+  /* ヒーローセクションをコンパクトに */
   .hero {
-    padding: 20px;
+    padding: 20px 18px;
+    margin-bottom: 20px;
   }
 
   .heroTitle {
     font-size: 1.1rem;
+    margin-bottom: 6px;
   }
 
-  /* 検索バーをモバイルで縮小 */
-  .searchBar {
-    width: 140px;
+  .heroSubtitle {
+    font-size: 0.82rem;
+    margin-bottom: 14px;
   }
 
-  .searchBar:focus-within {
-    width: 180px;
+  /* ヒーローのボタンを縦積みに */
+  .heroActions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .heroActions>* {
+    width: 100%;
+    text-align: center;
+  }
+
+  /* フィルタータブを横スクロールに */
+  .filterTabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    gap: 6px;
+    /* スクロールバー非表示 */
+    scrollbar-width: none;
+  }
+
+  .filterTabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filterTab {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* セクションタイトルをコンパクトに */
+  .sectionTitle {
+    font-size: 0.95rem;
+  }
+
+  /* 部屋グリッドを1列に */
+  .roomGrid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  /* イベントカードをモバイルで縦積みに */
+  .eventCard {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+
+  .eventInfo {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* 参加ボタンを右端に配置 */
+  .eventJoinBtnJoined,
+  .eventJoinBtnNotJoined {
+    margin-left: auto;
+  }
+
+  /* クラブグリッドを2列固定（モバイルでも見やすい） */
+  .clubGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  /* クラブカードをコンパクトに */
+  .clubCardItem {
+    padding: 12px;
+    gap: 7px;
+  }
+
+  .clubCardName {
+    font-size: 0.82rem;
+  }
+
+  /* モバイル専用検索バーを表示 */
+  .mobileSearch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-full);
+    margin-bottom: 14px;
+  }
+
+  .clubCardDesc {
+    font-size: 0.7rem;
   }
 }

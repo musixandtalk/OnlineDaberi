@@ -65,7 +65,9 @@
 /* =============================================
    リセット & ベーススタイル
    ============================================= */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -101,7 +103,8 @@ button {
   font-family: inherit;
 }
 
-input, textarea {
+input,
+textarea {
   font-family: inherit;
   outline: none;
 }
@@ -111,8 +114,14 @@ img {
   display: block;
 }
 
-ul, ol {
+ul,
+ol {
   list-style: none;
+}
+
+/* Next.js 開発ツールインジケーターを非表示 */
+#devtools-indicator {
+  display: none !important;
 }
 
 /* =============================================
@@ -122,13 +131,16 @@ ul, ol {
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: var(--bg-secondary);
 }
+
 ::-webkit-scrollbar-thumb {
   background: rgba(124, 58, 237, 0.4);
   border-radius: var(--border-radius-full);
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(124, 58, 237, 0.7);
 }
@@ -285,10 +297,29 @@ ul, ol {
   user-select: none;
 }
 
-.avatar-sm { width: 32px; height: 32px; font-size: 0.75rem; }
-.avatar-md { width: 44px; height: 44px; font-size: 0.9rem; }
-.avatar-lg { width: 56px; height: 56px; font-size: 1.1rem; }
-.avatar-xl { width: 80px; height: 80px; font-size: 1.5rem; }
+.avatar-sm {
+  width: 32px;
+  height: 32px;
+  font-size: 0.75rem;
+}
+
+.avatar-md {
+  width: 44px;
+  height: 44px;
+  font-size: 0.9rem;
+}
+
+.avatar-lg {
+  width: 56px;
+  height: 56px;
+  font-size: 1.1rem;
+}
+
+.avatar-xl {
+  width: 80px;
+  height: 80px;
+  font-size: 1.5rem;
+}
 
 /* =============================================
    アニメーション定義
@@ -296,55 +327,110 @@ ul, ol {
 
 /* スピーキング脈動エフェクト */
 @keyframes speaking-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 0 0 var(--speaking-glow),
-                0 0 0 0 var(--speaking-glow);
+      0 0 0 0 var(--speaking-glow);
   }
+
   50% {
     box-shadow: 0 0 0 8px rgba(124, 58, 237, 0.15),
-                0 0 0 16px rgba(124, 58, 237, 0.05);
+      0 0 0 16px rgba(124, 58, 237, 0.05);
   }
 }
 
 /* ドット点滅 */
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(0.85); }
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.6;
+    transform: scale(0.85);
+  }
 }
 
 /* フェードイン */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* スライドイン */
 @keyframes slideInLeft {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 /* スケールイン */
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* グラデーションシフト */
 @keyframes gradientShift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
 }
 
 /* フローティング */
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
 }
 
-.animate-fadeIn { animation: fadeIn 0.4s ease forwards; }
-.animate-scaleIn { animation: scaleIn 0.3s ease forwards; }
-.animate-slideIn { animation: slideInLeft 0.3s ease forwards; }
+.animate-fadeIn {
+  animation: fadeIn 0.4s ease forwards;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.3s ease forwards;
+}
+
+.animate-slideIn {
+  animation: slideInLeft 0.3s ease forwards;
+}
 
 /* =============================================
    レスポンシブブレークポイント
@@ -360,6 +446,7 @@ ul, ol {
   :root {
     --sidebar-width: 0px;
   }
+
   .container {
     padding: 0 16px;
   }
@@ -439,16 +526,20 @@ ul, ol {
    ローディングスケルトン
    ============================================= */
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .skeleton {
   background: linear-gradient(90deg,
-    var(--bg-tertiary) 25%,
-    rgba(255, 255, 255, 0.05) 50%,
-    var(--bg-tertiary) 75%
-  );
+      var(--bg-tertiary) 25%,
+      rgba(255, 255, 255, 0.05) 50%,
+      var(--bg-tertiary) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: var(--border-radius-sm);

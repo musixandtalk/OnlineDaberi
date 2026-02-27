@@ -1,10 +1,12 @@
 'use client'
 // ホームページ — オンダベ（OnlineDaberi）のフィードUI
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Sidebar from '@/components/Sidebar/Sidebar'
 import RoomCard from '@/components/RoomCard/RoomCard'
 import { mockRooms, mockClubs, mockEvents } from '@/lib/mockData'
+import type { Room } from '@/types'
 import styles from './page.module.css'
 
 // タブの定義
@@ -31,16 +33,232 @@ const formatEventTime = (date: Date) => {
 }
 
 export default function HomePage() {
+  const router = useRouter()
   const [activeFilter, setActiveFilter] = useState('all')
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  // 部屋一覧（モック＋作成した部屋）
+  const [rooms, setRooms] = useState<Room[]>(mockRooms)
+
+  // 部屋作成モーダルの状態
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [newRoomName, setNewRoomName] = useState('')
+  const [newRoomDesc, setNewRoomDesc] = useState('')
+  const [newRoomTags, setNewRoomTags] = useState('')
+  const [isPublic, setIsPublic] = useState(true)
+
   // フィルターに応じて表示する部屋を変更
-  const filteredRooms = mockRooms
+  const filteredRooms = rooms
+
+  // 部屋を作成してルームページに遷移
+  const handleCreateRoom = () => {
+    if (!newRoomName.trim()) return
+    const roomId = `room_${Date.now()}`
+    const newRoom: Room = {
+      id: roomId,
+      name: newRoomName.trim(),
+      description: newRoomDesc.trim(),
+      hostId: 'user_current',
+      hostName: 'ゲストさん',
+      hostAvatar: null,
+      clubId: null,
+      clubName: null,
+      isPublic,
+      tags: newRoomTags.split('　').concat(newRoomTags.split(' ')).map(t => t.trim()).filter(Boolean),
+      // 作成者のみ（Bot なし）
+      participantCount: 1,
+      speakers: [
+        // 自分（ホスト）のみ
+        { userId: 'user_current', username: 'guest', displayName: 'ゲストさん', avatarUrl: null, role: 'host', isMuted: true, isSpeaking: false, handRaised: false },
+      ],
+      listeners: [],
+      livekitRoomName: roomId,
+      createdAt: new Date(),
+    }
+
+    // localStorage に保存して、ルームページから参照できるようにする
+    try {
+      const existing = JSON.parse(localStorage.getItem('created_rooms') ?? '[]')
+      localStorage.setItem('created_rooms', JSON.stringify([newRoom, ...existing]))
+    } catch {
+      // localStorage が使えない環境では無視
+    }
+
+    setRooms(prev => [newRoom, ...prev])
+    setShowCreateModal(false)
+    setNewRoomName('')
+    setNewRoomDesc('')
+    setNewRoomTags('')
+    router.push(`/room/${roomId}`)
+  }
 
   return (
     <div className={styles.layout}>
       {/* サイドバー（モバイルではドロワー） */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      {/* 部屋作成モーダル */}
+      {showCreateModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.7)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            backdropFilter: 'blur(6px)',
+          }}
+          onClick={e => { if (e.target === e.currentTarget) setShowCreateModal(false) }}
+        >
+          <div style={{
+            background: '#16162a',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 20,
+            padding: '32px',
+            width: '100%',
+            maxWidth: 480,
+            boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 20,
+            animation: 'fadeUp 0.25s ease',
+          }}>
+            {/* ヘッダー */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                🎙️ 新しい部屋を作る
+              </h2>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' }}
+              >✕</button>
+            </div>
+
+            {/* 部屋名（必須） */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                部屋名 <span style={{ color: '#f87171' }}>*</span>
+              </label>
+              <input
+                type="text"
+                value={newRoomName}
+                onChange={e => setNewRoomName(e.target.value)}
+                placeholder="例：今夜のAIニュースを語ろう 🤖"
+                maxLength={60}
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.14)',
+                  borderRadius: 10,
+                  padding: '11px 14px',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                  transition: 'border-color 0.2s',
+                }}
+                onFocus={e => (e.target.style.borderColor = '#6366f1')}
+                onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.14)')}
+                autoFocus
+              />
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textAlign: 'right' }}>
+                {newRoomName.length}/60
+              </span>
+            </div>
+
+            {/* 説明（任意） */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                説明（任意）
+              </label>
+              <textarea
+                value={newRoomDesc}
+                onChange={e => setNewRoomDesc(e.target.value)}
+                placeholder="どんな話をする部屋ですか？"
+                rows={3}
+                maxLength={200}
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.14)',
+                  borderRadius: 10,
+                  padding: '11px 14px',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.85rem',
+                  outline: 'none',
+                  resize: 'none',
+                  transition: 'border-color 0.2s',
+                }}
+                onFocus={e => (e.target.style.borderColor = '#6366f1')}
+                onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.14)')}
+              />
+            </div>
+
+            {/* タグ（任意） */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                タグ（スペース区切り、任意）
+              </label>
+              <input
+                type="text"
+                value={newRoomTags}
+                onChange={e => setNewRoomTags(e.target.value)}
+                placeholder="例：AI テック 雑談"
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.14)',
+                  borderRadius: 10,
+                  padding: '11px 14px',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.85rem',
+                  outline: 'none',
+                  transition: 'border-color 0.2s',
+                }}
+                onFocus={e => (e.target.style.borderColor = '#6366f1')}
+                onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.14)')}
+              />
+            </div>
+
+            {/* 公開設定 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button
+                onClick={() => setIsPublic(!isPublic)}
+                style={{
+                  width: 44, height: 24, borderRadius: 12,
+                  border: 'none', cursor: 'pointer',
+                  background: isPublic ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'rgba(255,255,255,0.12)',
+                  position: 'relative', transition: 'background 0.25s', flexShrink: 0,
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 3, left: isPublic ? 22 : 3,
+                  width: 18, height: 18, borderRadius: '50%',
+                  background: 'white', transition: 'left 0.25s',
+                }} />
+              </button>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                {isPublic ? '🌐 公開部屋（誰でも参加可能）' : '🔒 非公開部屋（招待制）'}
+              </span>
+            </div>
+
+            {/* 作成ボタン */}
+            <button
+              onClick={handleCreateRoom}
+              disabled={!newRoomName.trim()}
+              style={{
+                background: newRoomName.trim()
+                  ? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
+                  : 'rgba(255,255,255,0.08)',
+                border: 'none',
+                borderRadius: 12,
+                padding: '13px',
+                color: newRoomName.trim() ? 'white' : 'var(--text-muted)',
+                fontSize: '0.95rem',
+                fontWeight: 700,
+                cursor: newRoomName.trim() ? 'pointer' : 'not-allowed',
+                transition: 'all 0.2s',
+              }}
+            >
+              🎙️ 部屋を作ってだべる！
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* メインコンテンツエリア */}
       <main className={styles.mainContent}>
@@ -67,8 +285,9 @@ export default function HomePage() {
                 className={styles.searchInput}
               />
             </div>
-            {/* 部屋作成ボタン */}
+            {/* 部屋作成ボタン — モーダルを開く */}
             <button
+              onClick={() => setShowCreateModal(true)}
               className="btn-primary"
               style={{ padding: '8px 18px', fontSize: '0.85rem' }}
             >
@@ -85,11 +304,27 @@ export default function HomePage() {
             <p className={styles.heroSubtitle}>
               今も誰かがだべってる。部屋を作って、気軽に話しかけてみよう。
             </p>
+
+            {/* モバイル専用：検索バー（PCでは非表示） */}
+            <div className={styles.mobileSearch}>
+              <span className={styles.searchIcon}>🔍</span>
+              <input
+                type="text"
+                placeholder="部屋・クラブ・ユーザーを検索..."
+                className={styles.searchInput}
+                style={{ width: '100%' }}
+              />
+            </div>
+
             <div className={styles.heroActions}>
-              <button className="btn-primary">🎙️ 今すぐだべる</button>
+              <button
+                className="btn-primary"
+                onClick={() => setShowCreateModal(true)}
+              >🎙️ 部屋を作る</button>
               <button className="btn-secondary">📅 だべり予定を入れる</button>
             </div>
           </div>
+
 
           {/* フィルタータブ */}
           <div className={styles.filterTabs}>
@@ -137,12 +372,10 @@ export default function HomePage() {
                 const { time, day } = formatEventTime(event.scheduledAt)
                 return (
                   <div key={event.id} className={styles.eventCard}>
-                    {/* 時刻 */}
                     <div className={styles.eventTime}>
                       <span className={styles.eventTimeHour}>{time}</span>
                       <span className={styles.eventTimeDay}>{day}</span>
                     </div>
-                    {/* 情報 */}
                     <div className={styles.eventInfo}>
                       <h3 className={styles.eventTitle}>{event.title}</h3>
                       <div className={styles.eventMeta}>
@@ -155,14 +388,7 @@ export default function HomePage() {
                         </span>
                       </div>
                     </div>
-                    {/* 参加ボタン */}
-                    <button
-                      className={
-                        event.isJoined
-                          ? styles.eventJoinBtnJoined
-                          : styles.eventJoinBtnNotJoined
-                      }
-                    >
+                    <button className={event.isJoined ? styles.eventJoinBtnJoined : styles.eventJoinBtnNotJoined}>
                       {event.isJoined ? '✅ 参加済み' : '📅 参加する'}
                     </button>
                   </div>
@@ -196,11 +422,7 @@ export default function HomePage() {
                     👥 {club.memberCount.toLocaleString()}人のメンバー
                   </p>
                   <button
-                    className={
-                      club.isFollowing
-                        ? styles.clubFollowBtnFollowing
-                        : styles.clubFollowBtnNotFollowing
-                    }
+                    className={club.isFollowing ? styles.clubFollowBtnFollowing : styles.clubFollowBtnNotFollowing}
                     onClick={(e) => e.preventDefault()}
                   >
                     {club.isFollowing ? '✅ フォロー中' : '＋ フォロー'}
@@ -214,3 +436,4 @@ export default function HomePage() {
     </div>
   )
 }
+
