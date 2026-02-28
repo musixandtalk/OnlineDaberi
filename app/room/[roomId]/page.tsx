@@ -1,13 +1,14 @@
 'use client'
-// オンダベ — 音声部屋ページ（LiveKit 音声通話・マイク選択・音量制御・リアクション対応）
+// オンダベ — 音声部屋ページ（LiveKit 音声通話・モデレーター・リアルタイム参加者管理）
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
 import {
   LiveKitRoom,
   useLocalParticipant,
   useConnectionState,
   useRemoteParticipants,
+  useRemoteParticipant,
+  useIsSpeaking,
 } from '@livekit/components-react'
 import '@livekit/components-styles'
 import { ConnectionState } from 'livekit-client'
@@ -16,6 +17,20 @@ import type { Room, RoomParticipant } from '@/types'
 import BGMPlayer from '@/components/BGMPlayer/BGMPlayer'
 import UpgradeBanner from '@/components/UpgradeBanner/UpgradeBanner'
 import MicrophoneSelector from '@/components/MicrophoneSelector/MicrophoneSelector'
+import {
+  type RoomState,
+  type RoomMember,
+  initRoomState,
+  joinAsListener,
+  subscribeToRoomState,
+  setHandRaised,
+  promoteToSpeaker,
+  demoteToListener,
+  grantModerator,
+  revokeModerator,
+  updateMuteState,
+  leaveRoom as leaveRoomState,
+} from '@/lib/roomState'
 import styles from './room.module.css'
 
 // リアクション定義（各リアクション専用の音色関数を持つ）
@@ -42,45 +57,61 @@ const MOCK_MESSAGES = [
   { id: 'm4', userId: 'u5', userName: 'Jake Mori', text: 'Cursor AIも合わせて使うと最強ですよ', time: '22:37' },
 ]
 
-// 参加者バブルコンポーネント（スピーカー用）
+// ─── スピーカーバブル（モデレーターメニュー付き） ──
 function SpeakerBubble({
   participant,
   isMe = false,
   avatarUrl,
+  isModerator = false,
+  onPromote,
+  onDemote,
+  onGrantMod,
+  onRevokeMod,
+  isHost = false,
+  memberRole,
 }: {
   participant: RoomParticipant
   isMe?: boolean
   avatarUrl?: string | null
+  isModerator?: boolean      // 自分がモデレーターか
+  onPromote?: () => void
+  onDemote?: () => void
+  onGrantMod?: () => void
+  onRevokeMod?: () => void
+  isHost?: boolean           // このバブルの人がホストか
+  memberRole?: string        // このバブルの人のロール
 }) {
+  const [showMenu, setShowMenu] = useState(false)
+
+  // ─── LiveKit から実際の発話状態を取得 ───
+  const { localParticipant } = useLocalParticipant()
+  const remoteParticipant = useRemoteParticipant(participant.userId)
+  const lkParticipant = isMe ? localParticipant : remoteParticipant
+  const isSpeaking = useIsSpeaking(lkParticipant)
+
   return (
     <div className={styles.participantBubble} style={{ position: 'relative' }}>
       {/* 「あなた」バッジ */}
       {isMe && (
         <span style={{
-          position: 'absolute',
-          top: -10,
-          left: '50%',
+          position: 'absolute', top: -10, left: '50%',
           transform: 'translateX(-50%)',
           background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-          color: 'white',
-          fontSize: '0.6rem',
-          fontWeight: 700,
-          padding: '2px 7px',
-          borderRadius: 20,
-          whiteSpace: 'nowrap',
-          zIndex: 2,
-          letterSpacing: '0.04em',
+          color: 'white', fontSize: '0.6rem', fontWeight: 700,
+          padding: '2px 7px', borderRadius: 20, whiteSpace: 'nowrap',
+          zIndex: 2, letterSpacing: '0.04em',
         }}>
           ★ あなた
         </span>
       )}
       <div
-        className={`${styles.bubbleAvatar} ${participant.isSpeaking ? styles.speaking : ''}`}
+        className={`${styles.bubbleAvatar} ${isSpeaking ? styles.speaking : ''}`}
         style={isMe ? {
-          outline: '3px solid #6366f1',
+          outline: isSpeaking ? '3px solid #ec4899' : '3px solid rgba(99, 102, 241, 0.4)',
           outlineOffset: 2,
           overflow: 'hidden',
           padding: 0,
+          transition: 'all 0.2s ease',
         } : undefined}
       >
         {/* アバター画像（アップロード済みの場合）*/}
@@ -93,25 +124,54 @@ function SpeakerBubble({
         ) : (
           getInitials(participant.displayName)
         )}
-        {/* ホストアイコン */}
-        {participant.role === 'host' && (
+        {/* ホスト/モデレーターアイコン */}
+        {(memberRole === 'host' || participant.role === 'host') && (
           <span className={styles.hostCrown}>👑</span>
+        )}
+        {memberRole === 'moderator' && participant.role !== 'host' && (
+          <span className={styles.hostCrown}>🛡️</span>
         )}
         {/* マイクステータス */}
         <span className={`${styles.micStatus} ${participant.isMuted ? styles.muted : styles.active}`}>
           {participant.isMuted ? '🔇' : '🎙️'}
         </span>
-        {/* 手を挙げているサイン */}
-        {participant.handRaised && (
-          <span className={styles.handRaisedBadge}>✋</span>
-        )}
       </div>
       <span className={styles.bubbleName}>
         {isMe ? 'あなた' : participant.displayName}
       </span>
       <span className={styles.bubbleRole}>
-        {participant.role === 'host' ? 'ホスト' : 'スピーカー'}
+        {memberRole === 'host' ? '👑 ホスト' : memberRole === 'moderator' ? '🛡️ モデレーター' : '🎙️ スピーカー'}
       </span>
+
+      {/* モデレーターメニュー（自分がモデレーターで、かつ相手がホストでない時） */}
+      {isModerator && !isMe && !isHost && (
+        <div style={{ position: 'relative', marginTop: 4 }}>
+          <button
+            className={styles.modMenuBtn}
+            onClick={() => setShowMenu(v => !v)}
+            title="管理操作"
+          >⋯</button>
+          {showMenu && (
+            <div className={styles.modMenu}>
+              {onDemote && (
+                <button className={styles.modMenuItem} onClick={() => { onDemote(); setShowMenu(false) }}>
+                  ⬇️ リスナーに移動
+                </button>
+              )}
+              {onGrantMod && memberRole !== 'moderator' && (
+                <button className={styles.modMenuItem} onClick={() => { onGrantMod(); setShowMenu(false) }}>
+                  🛡️ モデレーター権限を付与
+                </button>
+              )}
+              {onRevokeMod && memberRole === 'moderator' && (
+                <button className={styles.modMenuItemDanger} onClick={() => { onRevokeMod(); setShowMenu(false) }}>
+                  ❌ モデレーター権限を剥奪
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -417,7 +477,7 @@ export default function RoomPage() {
   const router = useRouter()
   const roomId = params.roomId as string
 
-  // localStorage（新規作成部屋）→ mockRooms の順で部屋を取得
+  // ─── 部屋情報を取得 ───────────────────────────────
   const room = (() => {
     try {
       const stored = JSON.parse(localStorage.getItem('created_rooms') ?? '[]') as Room[]
@@ -427,7 +487,6 @@ export default function RoomPage() {
     return mockRooms.find(r => r.id === roomId) ?? mockRooms[0]
   })()
 
-  // 新規作成部屋（localStorage にある）かどうかを判定
   const isNewRoom = !!(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('created_rooms') ?? '[]') as Room[]
@@ -435,119 +494,176 @@ export default function RoomPage() {
     } catch { return null }
   })()
 
-  // ローカル状態（新規部屋は YouTube タブをデフォルト表示）
+  // ─── 自分の識別子（簡易UID）───────────────────────
+  // 実際は Firebase Auth UID を使う。ここでは localStorage で永続化
+  const myUid = (() => {
+    if (typeof window === 'undefined') return 'uid_unknown'
+    let uid = localStorage.getItem('ondabe_uid')
+    if (!uid) { uid = `uid_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`; localStorage.setItem('ondabe_uid', uid) }
+    return uid
+  })()
+  const isGuest = true
+  const guestName = (typeof window !== 'undefined' ? localStorage.getItem('ondabe_name') : null) ?? `ゲスト${myUid.slice(-4)}`
+
+  // 自分が部屋の作成者（ホスト）かどうか
+  const amIHost = isNewRoom
+
+  // ─── Firestore リアルタイム状態 ───────────────────
+  const [roomState, setRoomState] = useState<RoomState | null>(null)
+  const [stateReady, setStateReady] = useState(false)
+
+  // 自分のロール（roomState から抽出）
+  const myRole: RoomMember['role'] = (() => {
+    if (!roomState) return amIHost ? 'host' : 'listener'
+    const m = roomState.members[myUid]
+    return m?.role ?? (amIHost ? 'host' : 'listener')
+  })()
+
+  const amIModerator = myRole === 'host' || myRole === 'moderator'
+  const amISpeaker = ['host', 'moderator', 'speaker'].includes(myRole)
+  const myHandRaised = roomState?.raisedHandUids?.includes(myUid) ?? false
+
+  // ─── ローカル UI 状態 ─────────────────────────────
   const [isMuted, setIsMuted] = useState(true)
-  const [handRaised, setHandRaised] = useState(false)
-  const [activeTab, setActiveTab] = useState<'chat' | 'participants' | 'bgm' | 'youtube'>(isNewRoom ? 'youtube' : 'chat')
+  const [activeTab, setActiveTab] = useState<'chat' | 'participants' | 'bgm'>('chat')
   const [chatMessage, setChatMessage] = useState('')
   const [messages, setMessages] = useState(isNewRoom ? [] : MOCK_MESSAGES)
   const [showReactions, setShowReactions] = useState(false)
-  const reactionBtnRef = useRef<HTMLDivElement>(null)
-  // モバイル用ドロワー（サイドパネル）の開閉
   const [drawerOpen, setDrawerOpen] = useState(false)
-  // 三点リーダーメニューの開閉
   const [showRoomMenu, setShowRoomMenu] = useState(false)
-
-  // アバター画像（変更可能）——画像アップロード対応
   const [userAvatar, setUserAvatar] = useState<string | null>(null)
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
-  const avatarBtnRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  // YouTube 埋め込み状態
   const [youtubeInput, setYoutubeInput] = useState('')
   const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null)
   const [youtubeVolume, setYoutubeVolume] = useState(80)
-  const iframeRef = useRef<HTMLIFrameElement>(null)
-  // タブ間・ウィンドウ間の同期用 BroadcastChannel
-  const channelRef = useRef<BroadcastChannel | null>(null)
-
-  // URL から動画 ID を抽出して設定 + ブロードキャスト
-  const applyYoutubeUrl = (input: string) => {
-    const match = input.match(/(?:youtu\.be\/|watch\?v=|embed\/|shorts\/|live\/)?([\w-]{11})/)
-    const videoId = match ? match[1] : null
-    setYoutubeVideoId(videoId)
-    channelRef.current?.postMessage({ type: 'yt-sync', videoId })
-    setYoutubeInput('')
-  }
-
-  // iframeに対して音量を送信（YouTube IFrame API の postMessageを利用）
-  const sendYoutubeVolume = (vol: number) => {
-    iframeRef.current?.contentWindow?.postMessage(
-      JSON.stringify({ event: 'command', func: 'setVolume', args: [vol] }),
-      '*'
-    )
-  }
-
-  // LiveKit トークンの状態
   const [livekitToken, setLivekitToken] = useState<string | null>(null)
+
+  const reactionBtnRef = useRef<HTMLDivElement>(null)
+  const avatarBtnRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const channelRef = useRef<BroadcastChannel | null>(null)
   const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL ?? ''
 
-  // BroadcastChannel をセットアップ（同じルームIDのタブ間で同期）
+  // ─── Firestore 状態の初期化 & 購読 ────────────────
+  useEffect(() => {
+    let unsub: (() => void) | null = null
+
+    const setup = async () => {
+      if (amIHost) {
+        // ホストは状態ドキュメントを作成
+        await initRoomState(roomId, myUid, guestName).catch(() => { })
+      } else {
+        // リスナーとして参加登録
+        await joinAsListener(roomId, myUid, guestName).catch(() => { })
+      }
+
+      // リアルタイム購読開始
+      unsub = subscribeToRoomState(roomId, (state) => {
+        setRoomState(state)
+        setStateReady(true)
+      })
+    }
+
+    setup()
+    return () => { unsub?.() }
+  }, [roomId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── LiveKit トークン取得（自分のロールに応じて） ──
+  useEffect(() => {
+    if (!stateReady && !amIHost) return  // 状態確定まで待機
+    const fetchToken = async () => {
+      try {
+        const role = amIHost ? 'host' : myRole
+        const res = await fetch(
+          `/api/livekit-token?room=${encodeURIComponent(room.livekitRoomName)}&username=${encodeURIComponent(myUid)}&role=${role}`
+        )
+        const data = await res.json()
+        if (data.token) setLivekitToken(data.token)
+      } catch (err) {
+        console.error('LiveKit トークン取得失敗:', err)
+      }
+    }
+    fetchToken()
+  }, [stateReady, myRole]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── BroadcastChannel（YouTube 同期） ──────────────
   useEffect(() => {
     const ch = new BroadcastChannel(`ondabe-room-${roomId}`)
     channelRef.current = ch
     ch.onmessage = (e) => {
-      if (e.data?.type === 'yt-sync') {
-        setYoutubeVideoId(e.data.videoId ?? null)
-      }
+      if (e.data?.type === 'yt-sync') setYoutubeVideoId(e.data.videoId ?? null)
     }
     return () => ch.close()
   }, [roomId])
 
-  // デモ用：匿名ユーザーとして表示
-  const isGuest = true
-  const guestName = 'ゲスト4829'
+  const applyYoutubeVideoId = (videoId: string | null) => {
+    setYoutubeVideoId(videoId)
+    channelRef.current?.postMessage({ type: 'yt-sync', videoId })
+  }
 
-  // 部屋に入る際にトークンを取得
-  useEffect(() => {
-    const fetchToken = async () => {
-      try {
-        const username = encodeURIComponent(guestName)
-        const roomName = encodeURIComponent(room.livekitRoomName)
-        const res = await fetch(`/api/livekit-token?room=${roomName}&username=${username}`)
-        const data = await res.json()
-        if (data.token) setLivekitToken(data.token)
-      } catch (err) {
-        console.error('LiveKit トークンの取得に失敗しました:', err)
-      }
-    }
-    fetchToken()
-  }, [room.livekitRoomName, guestName])
+  const applyYoutubeUrl = (input: string) => {
+    const match = input.match(/(?:youtu\.be\/|watch\?v=|embed\/|shorts\/|live\/)?([\w-]{11})/)
+    const videoId = match ? match[1] : null
+    applyYoutubeVideoId(videoId)
+    setYoutubeInput('')
+  }
+  const sendYoutubeVolume = (vol: number) => {
+    iframeRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: 'command', func: 'setVolume', args: [vol] }), '*'
+    )
+  }
 
-  // 発話シミュレーション（デモ用）
-  const [speakingUserId, setSpeakingUserId] = useState<string | null>('u1')
-  useEffect(() => {
-    const speakers = room.speakers.filter(s => !s.isMuted)
-    if (speakers.length === 0) return
-    const interval = setInterval(() => {
-      const randomSpeaker = speakers[Math.floor(Math.random() * speakers.length)]
-      setSpeakingUserId(randomSpeaker.userId)
-    }, 3000)
-    return () => clearInterval(interval)
-  }, [room.speakers])
 
-  // チャット送信（Bot なし、シンプルバージョン）
+
+  // ─── モデレーター操作 ────────────────────────────
+  const handlePromote = useCallback(async (uid: string) => {
+    await promoteToSpeaker(roomId, uid)
+  }, [roomId])
+
+  const handleDemote = useCallback(async (uid: string) => {
+    await demoteToListener(roomId, uid)
+  }, [roomId])
+
+  const handleGrantMod = useCallback(async (uid: string) => {
+    await grantModerator(roomId, uid)
+  }, [roomId])
+
+  const handleRevokeMod = useCallback(async (uid: string) => {
+    if (!roomState) return
+    await revokeModerator(roomId, uid, roomState.hostUid)
+  }, [roomId, roomState])
+
+  // ─── 手を挙げる / 下げる ─────────────────────────
+  const handleHandRaise = useCallback(async () => {
+    await setHandRaised(roomId, myUid, !myHandRaised)
+  }, [roomId, myUid, myHandRaised])
+
+  // ─── ミュート状態を Firestore にも反映 ────────────
+  const handleToggleMute = useCallback(async () => {
+    const next = !isMuted
+    setIsMuted(next)
+    await updateMuteState(roomId, myUid, next)
+  }, [roomId, myUid, isMuted])
+
+  // ─── チャット送信 ─────────────────────────────────
   const handleSendMessage = useCallback(() => {
     if (!chatMessage.trim()) return
     const userMsg = {
       id: `m${Date.now()}`,
-      userId: 'user_current',
+      userId: myUid,
       userName: guestName,
       text: chatMessage.trim(),
       time: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
     }
     setMessages(prev => [...prev, userMsg])
     setChatMessage('')
-  }, [chatMessage, guestName])
+  }, [chatMessage, guestName, myUid])
 
-  // 退出処理（新規部屋の場合は確認ダイアログを表示）
-  const handleLeave = () => {
-    const confirmMsg = isNewRoom
-      ? '部屋から退出するとこの部屋は閉じられます。本当に退出しますか？'
-      : '部屋から退出しますか？'
-    if (!window.confirm(confirmMsg)) return
-    // localStorage からこの部屋を削除
+  // ─── 退出処理 ─────────────────────────────────────
+  const handleLeave = useCallback(async () => {
+    if (!window.confirm(isNewRoom ? '部屋から退出すると閉じられます。よろしいですか？' : '部屋から退出しますか？')) return
+    await leaveRoomState(roomId, myUid).catch(() => { })
     if (isNewRoom) {
       try {
         const stored = JSON.parse(localStorage.getItem('created_rooms') ?? '[]') as Room[]
@@ -555,16 +671,20 @@ export default function RoomPage() {
       } catch { /* 無視 */ }
     }
     router.push('/')
-  }
+  }, [isNewRoom, roomId, myUid, router])
 
-  // リスナー表示数の上限
-  const displayListeners = room.listeners.slice(0, 30)
-  const remainingListeners = room.listeners.length - 30
+  // ─── Firestore からスピーカー/リスナー一覧を構築 ──
+  const speakerMembers: RoomMember[] = roomState
+    ? (roomState.speakerUids ?? []).map(uid => roomState.members[uid]).filter(Boolean)
+    : []
+  const listenerMembers: RoomMember[] = roomState
+    ? (roomState.listenerUids ?? []).map(uid => roomState.members[uid]).filter(Boolean)
+    : []
+  const raisedHandUids = roomState?.raisedHandUids ?? []
 
-  // LiveKit に接続中かどうかの表示ラベル
   const micLabel = isMuted ? 'ミュート中' : 'オン'
 
-  // LiveKit に接続できていない場合は読み込み中を表示
+  // ─── 接続待ち表示 ────────────────────────────────
   if (!livekitToken) {
     return (
       <div className={styles.roomLayout} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -575,509 +695,574 @@ export default function RoomPage() {
 
   return (
     // LiveKitRoom：この中のコンポーネントが LiveKit サーバーに接続される
-    <LiveKitRoom
-      serverUrl={livekitUrl}
-      token={livekitToken}
-      connect={true}
-      audio={true}
-      video={false}
-      onDisconnected={handleLeave}
-    >
-      <div className={styles.roomLayout}>
-        {/* ゲストユーザー向けアップグレードバナー（匿名ユーザーのみ表示） */}
-        {isGuest && <UpgradeBanner guestName={guestName} />}
-        {/* ルームヘッダー */}
-        <header className={styles.roomHeader}>
-          <div className={styles.roomHeaderLeft}>
-            <button
-              onClick={handleLeave}
-              className={styles.backBtn}
-            >
-              ← 戻る
-            </button>
-            <div className={styles.roomHeaderInfo}>
-              <h1 className={styles.roomHeaderTitle}>
-                <span className="badge badge-live">LIVE</span>
-                {room.name}
-              </h1>
-              <div className={styles.roomHeaderMeta}>
-                {room.clubName && (
-                  <span className={styles.roomHeaderClub}>🏛️ {room.clubName}</span>
-                )}
-                <span className={styles.roomHeaderCount}>
-                  👥 {room.participantCount}人参加中
-                </span>
+    <>
+      <LiveKitRoom
+        serverUrl={livekitUrl}
+        token={livekitToken}
+        connect={true}
+        audio={true}
+        video={false}
+        onDisconnected={handleLeave}
+      >
+        <div className={styles.roomLayout}>
+          {/* ゲストユーザー向けアップグレードバナー（匿名ユーザーのみ表示） */}
+          {isGuest && <UpgradeBanner guestName={guestName} />}
+          {/* ルームヘッダー */}
+          <header className={styles.roomHeader}>
+            <div className={styles.roomHeaderLeft}>
+              <button
+                onClick={handleLeave}
+                className={styles.backBtn}
+              >
+                ← 戻る
+              </button>
+              <div className={styles.roomHeaderInfo}>
+                <h1 className={styles.roomHeaderTitle}>
+                  <span className="badge badge-live">LIVE</span>
+                  {room.name}
+                </h1>
+                <div className={styles.roomHeaderMeta}>
+                  {room.clubName && (
+                    <span className={styles.roomHeaderClub}>🏛️ {room.clubName}</span>
+                  )}
+                  <span className={styles.roomHeaderCount}>
+                    👥 {room.participantCount}人参加中
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-          <div className={styles.roomHeaderRight}>
-            <button className="btn-secondary" style={{ padding: '7px 14px', fontSize: '0.82rem' }}
-              onClick={() => {
-                // 現在のURLをクリップボードにコピー
-                navigator.clipboard.writeText(window.location.href).then(() => {
-                  alert('部屋のURLをコピーしました！')
-                })
-              }}
-            >
-              🔗 シェア
-            </button>
-            {/* 三点リーダーメニュー */}
-            <div style={{ position: 'relative' }}>
-              <button
-                className="btn-ghost"
-                style={{ padding: '7px 14px', fontSize: '0.82rem' }}
-                onClick={() => setShowRoomMenu(prev => !prev)}
-                id="room-menu-btn"
+            <div className={styles.roomHeaderRight}>
+              <button className="btn-secondary" style={{ padding: '7px 14px', fontSize: '0.82rem' }}
+                onClick={() => {
+                  // 現在のURLをクリップボードにコピー
+                  navigator.clipboard.writeText(window.location.href).then(() => {
+                    alert('部屋のURLをコピーしました！')
+                  })
+                }}
               >
-                ⋯
+                🔗 シェア
               </button>
-              {showRoomMenu && (
-                <div style={{
-                  position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-                  background: '#1e1e2e',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: 12, padding: 8,
-                  minWidth: 180,
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-                  zIndex: 300,
-                  animation: 'fadeUp 0.15s ease',
-                }}>
-                  {[
-                    { icon: '👥', label: '参加者を見る', action: () => { setActiveTab('participants'); setDrawerOpen(true); setShowRoomMenu(false) } },
-                    { icon: '🎵', label: 'BGMを操作', action: () => { setActiveTab('bgm'); setDrawerOpen(true); setShowRoomMenu(false) } },
-                    { icon: '📺', label: 'YouTubeを埋める', action: () => { setActiveTab('youtube'); setDrawerOpen(true); setShowRoomMenu(false) } },
-                    { icon: '🔗', label: 'URLをコピー', action: () => { navigator.clipboard.writeText(window.location.href); setShowRoomMenu(false) } },
-                    { icon: '🚪', label: '退出する', action: () => { handleLeave(); setShowRoomMenu(false) }, danger: true },
-                  ].map(item => (
-                    <button
-                      key={item.label}
-                      onClick={item.action}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 10,
-                        width: '100%', padding: '9px 12px',
-                        background: 'transparent',
-                        border: 'none', borderRadius: 8,
-                        color: item.danger ? '#f87171' : 'var(--text-primary)',
-                        fontSize: '0.83rem', cursor: 'pointer', textAlign: 'left',
-                        transition: 'background 0.15s',
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <span>{item.icon}</span>
-                      <span>{item.label}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* 三点リーダーメニュー */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  className="btn-ghost"
+                  style={{ padding: '7px 14px', fontSize: '0.82rem' }}
+                  onClick={() => setShowRoomMenu(prev => !prev)}
+                  id="room-menu-btn"
+                >
+                  ⋯
+                </button>
+                {showRoomMenu && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                    background: '#1e1e2e',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: 12, padding: 8,
+                    minWidth: 180,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                    zIndex: 300,
+                    animation: 'fadeUp 0.15s ease',
+                  }}>
+                    {[
+                      { icon: '👥', label: '参加者を見る', action: () => { setActiveTab('participants'); setDrawerOpen(true); setShowRoomMenu(false) } },
+                      { icon: '🎵', label: 'BGMを操作', action: () => { setActiveTab('bgm'); setDrawerOpen(true); setShowRoomMenu(false) } },
+                      { icon: '🔗', label: 'URLをコピー', action: () => { navigator.clipboard.writeText(window.location.href); setShowRoomMenu(false) } },
+                      { icon: '🚪', label: '退出する', action: () => { handleLeave(); setShowRoomMenu(false) }, danger: true },
+                    ].map(item => (
+                      <button
+                        key={item.label}
+                        onClick={item.action}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          width: '100%', padding: '9px 12px',
+                          background: 'transparent',
+                          border: 'none', borderRadius: 8,
+                          color: item.danger ? '#f87171' : 'var(--text-primary)',
+                          fontSize: '0.83rem', cursor: 'pointer', textAlign: 'left',
+                          transition: 'background 0.15s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <span>{item.icon}</span>
+                        <span>{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
 
-        {/* メインコンテンツ */}
-        <div className={styles.roomContent}>
-          {/* 空間レイアウトエリア */}
-          <div className={styles.spatialArea}>
-            {/* YouTube プレイヤー（常時表示） */}
-            <div className={styles.youtubeArea}>
-              {/* URL 入力行 */}
-              <div className={styles.youtubeInputRow}>
-                <span style={{ fontSize: '0.9rem', flexShrink: 0 }}>📺</span>
-                <input
-                  type="text"
-                  value={youtubeInput}
-                  onChange={e => setYoutubeInput(e.target.value)}
-                  placeholder="YouTube URL を貼り付けて Enter..."
-                  onKeyDown={e => { if (e.key === 'Enter') applyYoutubeUrl(youtubeInput) }}
-                />
-                <button className={styles.youtubePlayBtn} onClick={() => applyYoutubeUrl(youtubeInput)}>▶ 再生</button>
+          {/* メインコンテンツ */}
+          <div className={styles.roomContent}>
+            {/* 空間レイアウトエリア */}
+            <div className={styles.spatialArea}>
+              {/* YouTube プレイヤー */}
+              <div className={styles.youtubeArea}>
+                <div
+                  className={styles.zoneTitleRow}
+                  style={{ cursor: 'pointer', marginBottom: youtubeVideoId ? 16 : 0, borderBottom: youtubeVideoId ? '1px solid var(--border-color)' : 'none', paddingBottom: youtubeVideoId ? 12 : 0 }}
+                  onClick={() => {
+                    if (!youtubeVideoId) {
+                      const url = prompt('YouTube URLを入力してください:')
+                      if (url) applyYoutubeUrl(url)
+                    }
+                  }}
+                >
+                  <span className={styles.zoneTitle}>📺 YouTube BGM</span>
+                  {!youtubeVideoId && (
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: 8 }}>（タップしてURLを入力）</span>
+                  )}
+                  {youtubeVideoId && (
+                    <button
+                      className={styles.youtubeClearBtn}
+                      style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24 }}
+                      onClick={(e) => { e.stopPropagation(); applyYoutubeVideoId(null) }}
+                    >✕</button>
+                  )}
+                </div>
+
                 {youtubeVideoId && (
-                  <button className={styles.youtubeClearBtn} onClick={() => { setYoutubeVideoId(null); channelRef.current?.postMessage({ type: 'yt-sync', videoId: null }) }}>✕</button>
-                )}
-                {youtubeVideoId && <span className={styles.youtubeSyncBadge}>🟢 同期中</span>}
-              </div>
-
-              {/* プレイヤー or プレースホルダー */}
-              {youtubeVideoId ? (
-                <>
-                  <div className={styles.youtubePlayerWrap}>
-                    <iframe
-                      ref={iframeRef}
-                      src={`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&enablejsapi=1`}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      title="YouTube 動画プレイヤー"
-                    />
-                  </div>
-                  {/* 音量コントロール */}
-                  <div className={styles.youtubeVolumeRow}>
-                    <button
-                      className={styles.youtubeVolumeBtn}
-                      onClick={() => { const v = youtubeVolume === 0 ? 80 : 0; setYoutubeVolume(v); sendYoutubeVolume(v) }}
-                    >
-                      {youtubeVolume === 0 ? '🔇' : youtubeVolume < 50 ? '🔉' : '🔊'}
-                    </button>
-                    <input
-                      type="range" min={0} max={100} value={youtubeVolume}
-                      onChange={e => { const v = Number(e.target.value); setYoutubeVolume(v); sendYoutubeVolume(v) }}
-                      style={{ flex: 1, accentColor: '#818cf8', cursor: 'pointer' }}
-                    />
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', width: 32, textAlign: 'right' }}>{youtubeVolume}%</span>
-                  </div>
-                </>
-              ) : (
-                <div className={styles.youtubePlaceholder}>
-                  <span className={styles.youtubePlaceholderIcon}>📺</span>
-                  <span>URL を入力すると全員に同期されます</span>
-                </div>
-              )}
-            </div>
-
-            {/* スピーカーゾーン */}
-
-            <section className={styles.speakersSection}>
-              <div className={styles.zoneTitleRow}>
-                <span className={styles.zoneTitle}>🎙️ スピーカー</span>
-                <span className={styles.zoneCount}>{room.speakers.length}</span>
-              </div>
-              <div className={styles.speakerGrid}>
-                {room.speakers.map((speaker) => (
-                  <SpeakerBubble
-                    key={speaker.userId}
-                    participant={{
-                      ...speaker,
-                      isSpeaking: speaker.userId === speakingUserId && !speaker.isMuted,
-                    }}
-                    isMe={speaker.userId === 'user_current'}
-                    avatarUrl={speaker.userId === 'user_current' ? userAvatar : null}
-                  />
-                ))}
-              </div>
-            </section>
-
-            {/* リスナーゾーン */}
-            <section className={styles.listenersSection}>
-              <div className={styles.zoneTitleRow}>
-                <span className={styles.zoneTitle}>🎧 リスナー</span>
-                <span className={styles.zoneCount}>{room.listeners.length}</span>
-              </div>
-              <div className={styles.listenerGrid}>
-                {displayListeners.map((listener) => (
-                  <ListenerBubble
-                    key={listener.userId}
-                    participant={listener}
-                    isMe={listener.userId === 'user_current'}
-                    avatarUrl={listener.userId === 'user_current' ? userAvatar : null}
-                  />
-                ))}
-                {remainingListeners > 0 && (
-                  <div className={styles.moreListeners}>
-                    +{remainingListeners}
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
-
-          {/* モバイル専用：右下フローティングボタン（ドロワーを開く） */}
-          <button
-            className={styles.floatingPanelBtn}
-            onClick={() => setDrawerOpen(true)}
-            title="チャット・YouTube・参加者を開く"
-            aria-label="パネルを開く"
-          >
-            {activeTab === 'youtube' ? '📺' : activeTab === 'participants' ? '👥' : '💬'}
-          </button>
-
-          {/* モバイル用ドロワーオーバーレイ（背景タップで閉じる） */}
-          {drawerOpen && (
-            <div
-              className={styles.drawerOverlay}
-              onClick={() => setDrawerOpen(false)}
-            />
-          )}
-
-          {/* サイドパネル（デスクトップ：右固定 / モバイル：下からドロワー） */}
-          <aside className={`${styles.sidePanel} ${drawerOpen ? styles.drawerOpen : ''}`}>
-            <div className={styles.sidePanelTabs}>
-              <button
-                className={`${styles.sidePanelTab} ${activeTab === 'chat' ? styles.active : ''}`}
-                onClick={() => setActiveTab('chat')}
-              >
-                💬 チャット
-              </button>
-              <button
-                className={`${styles.sidePanelTab} ${activeTab === 'participants' ? styles.active : ''}`}
-                onClick={() => setActiveTab('participants')}
-              >
-                👥 参加者
-              </button>
-              <button
-                className={`${styles.sidePanelTab} ${activeTab === 'bgm' ? styles.active : ''}`}
-                onClick={() => setActiveTab('bgm')}
-              >
-                🎵 BGM
-              </button>
-            </div>
-
-            <div className={styles.sidePanelContent}>
-              {activeTab === 'chat' ? (
-                /* チャットタブ */
-                <div>
-                  {messages.map((msg) => (
-                    <div key={msg.id} className={styles.chatMessage}>
-                      <div className={styles.chatMessageHeader}>
-                        <span className={styles.chatUserName}>{msg.userName}</span>
-                        <span className={styles.chatTime}>{msg.time}</span>
-                      </div>
-                      <p className={styles.chatMessageText}>{msg.text}</p>
+                  <>
+                    <div className={styles.youtubePlayerWrap}>
+                      <iframe
+                        ref={iframeRef}
+                        src={`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&enablejsapi=1`}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        title="YouTube 動画プレイヤー"
+                      />
                     </div>
+                    {/* 音量コントロール */}
+                    <div className={styles.youtubeVolumeRow} style={{ marginTop: 8 }}>
+                      <button
+                        className={styles.youtubeVolumeBtn}
+                        onClick={() => { const v = youtubeVolume === 0 ? 80 : 0; setYoutubeVolume(v); sendYoutubeVolume(v) }}
+                      >
+                        {youtubeVolume === 0 ? '🔇' : youtubeVolume < 50 ? '🔉' : '🔊'}
+                      </button>
+                      <input
+                        type="range" min={0} max={100} value={youtubeVolume}
+                        onChange={e => { const v = Number(e.target.value); setYoutubeVolume(v); sendYoutubeVolume(v) }}
+                        style={{ flex: 1, accentColor: '#818cf8', cursor: 'pointer' }}
+                      />
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', width: 32, textAlign: 'right' }}>{youtubeVolume}%</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* ─── スピーカーゾーン ─── */}
+              <section className={styles.speakersSection}>
+                <div className={styles.zoneTitleRow}>
+                  <span className={styles.zoneTitle}>🎙️ スピーカー</span>
+                  <span className={styles.zoneCount}>{speakerMembers.length}</span>
+                </div>
+                <div className={styles.speakerGrid}>
+                  {speakerMembers.map((member) => (
+                    <SpeakerBubble
+                      key={member.uid}
+                      participant={{
+                        userId: member.uid,
+                        username: member.uid,
+                        displayName: member.displayName,
+                        avatarUrl: null,
+                        role: member.role === 'host' ? 'host' : 'speaker',
+                        isMuted: member.isMuted,
+                        isSpeaking: false,
+                        handRaised: false,
+                      }}
+                      isMe={member.uid === myUid}
+                      avatarUrl={member.uid === myUid ? userAvatar : null}
+                      isModerator={amIModerator}
+                      isHost={member.role === 'host'}
+                      memberRole={member.role}
+                      onDemote={() => handleDemote(member.uid)}
+                      onGrantMod={() => handleGrantMod(member.uid)}
+                      onRevokeMod={() => handleRevokeMod(member.uid)}
+                    />
                   ))}
                 </div>
-              ) : activeTab === 'bgm' ? (
-                /* BGMタブ — ルーム内専用 */
-                <BGMPlayer />
-              ) : (
-                /* 参加者タブ — 音量スライダー付き */
-                <div>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                    スピーカー ({room.speakers.length})
-                  </p>
-                  {room.speakers.map(s => (
-                    <div key={s.userId} style={{ padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
-                      {/* 参加者情報 */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 6 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--accent-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'white', flexShrink: 0 }}>
-                          {getInitials(s.displayName)}
+              </section>
+
+              {/* ─── 手挙げ通知（モデレーター向け） ─── */}
+              {amIModerator && raisedHandUids.length > 0 && (
+                <section className={styles.raisedHandsSection}>
+                  <div className={styles.zoneTitleRow}>
+                    <span className={styles.zoneTitle}>✋ 発言リクエスト</span>
+                    <span className={styles.zoneCount}>{raisedHandUids.length}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {raisedHandUids.map(uid => {
+                      const m = roomState?.members[uid]
+                      if (!m) return null
+                      return (
+                        <div key={uid} className={styles.handRaiseRow}>
+                          <span className={styles.handRaiseName}>✋ {m.displayName}</span>
+                          <button
+                            className={styles.promoteBtn}
+                            onClick={() => handlePromote(uid)}
+                          >
+                            ステージへ ↑
+                          </button>
                         </div>
-                        <div style={{ flex: 1 }}>
-                          <p style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{s.displayName}</p>
-                          <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                            {s.role === 'host' ? '👑 ホスト' : '🎙️ スピーカー'}{s.isSpeaking ? ' · 発話中...' : ''}
-                          </p>
-                        </div>
-                        <span style={{ fontSize: '0.9rem' }}>{s.isMuted ? '🔇' : '🎙️'}</span>
-                      </div>
-                      {/* 音量スライダー（自分以外のみ表示） */}
-                      {s.userId !== 'user_current' && (
-                        <RemoteVolumeControl
-                          participantIdentity={s.userId}
-                          displayName={s.displayName}
-                        />
+                      )
+                    })}
+                  </div>
+                </section>
+              )}
+
+              {/* ─── リスナーゾーン ─── */}
+              <section className={styles.listenersSection}>
+                <div className={styles.zoneTitleRow}>
+                  <span className={styles.zoneTitle}>🎧 リスナー</span>
+                  <span className={styles.zoneCount}>{listenerMembers.length}</span>
+                </div>
+                <div className={styles.listenerGrid}>
+                  {listenerMembers.slice(0, 30).map((member) => (
+                    <div key={member.uid} style={{ position: 'relative' }}>
+                      <ListenerBubble
+                        participant={{
+                          userId: member.uid,
+                          username: member.uid,
+                          displayName: member.displayName,
+                          avatarUrl: null,
+                          role: 'speaker',
+                          isMuted: true,
+                          isSpeaking: false,
+                          handRaised: raisedHandUids.includes(member.uid),
+                        }}
+                        isMe={member.uid === myUid}
+                        avatarUrl={member.uid === myUid ? userAvatar : null}
+                      />
+                      {/* モデレーターがリスナーをステージへ上げるボタン */}
+                      {amIModerator && member.uid !== myUid && (
+                        <button
+                          className={styles.promoteSmallBtn}
+                          onClick={() => handlePromote(member.uid)}
+                          title="ステージへ上げる"
+                        >↑</button>
                       )}
                     </div>
                   ))}
-                </div>
-              )}
-            </div>
-
-            {/* チャット入力エリア */}
-            {activeTab === 'chat' && (
-              <div className={styles.chatInputArea}>
-                <textarea
-                  value={chatMessage}
-                  onChange={e => setChatMessage(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      handleSendMessage()
-                    }
-                  }}
-                  placeholder="メッセージを入力... (Enter で送信)"
-                  className={styles.chatInput}
-                  rows={2}
-                />
-              </div>
-            )}
-          </aside>
-        </div>
-
-        {/* コントロールバー（下部） */}
-        <footer className={styles.controlBar}>
-
-          {/* マイクボタン ＋ デバイス選択（MicrophoneSelector でラップ） */}
-          <MicrophoneSelector>
-            <button
-              id="mute-toggle-btn"
-              className={`${styles.controlBtn} ${styles.muteBtn} ${isMuted ? styles.muted : styles.unmuted}`}
-              onClick={() => setIsMuted(!isMuted)}
-              style={{ borderRadius: '8px 0 0 8px' }}
-            >
-              <MicControl isMuted={isMuted} onToggle={() => setIsMuted(!isMuted)} />
-              <span className={styles.controlBtnLabel}>{micLabel}</span>
-            </button>
-          </MicrophoneSelector>
-
-          {/* 手を挙げる */}
-          <button
-            id="hand-raise-btn"
-            className={`${styles.controlBtn} ${handRaised ? styles.active : ''}`}
-            onClick={() => setHandRaised(!handRaised)}
-          >
-            <span className={styles.controlBtnIcon}>✋</span>
-            <span className={styles.controlBtnLabel}>{handRaised ? '手を下げる' : '手を挙げる'}</span>
-          </button>
-
-          {/* リアクションボタン */}
-          <div ref={reactionBtnRef} style={{ position: 'relative' }}>
-            {showReactions && <ReactionPanel onClose={() => setShowReactions(false)} />}
-            <button
-              id="reaction-btn"
-              className={styles.controlBtn}
-              onClick={() => setShowReactions(prev => !prev)}
-            >
-              <span className={styles.controlBtnIcon}>😊</span>
-              <span className={styles.controlBtnLabel}>リアクション</span>
-            </button>
-          </div>
-
-          {/* アバター変更ボタン（画像アップロード対応） */}
-          <div ref={avatarBtnRef} style={{ position: 'relative' }}>
-            {/* 非表示のファイル入力 */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={e => {
-                const file = e.target.files?.[0]
-                if (!file) return
-                const reader = new FileReader()
-                reader.onload = ev => {
-                  if (ev.target?.result) {
-                    setUserAvatar(ev.target.result as string)
-                    setShowAvatarPicker(false)
-                  }
-                }
-                reader.readAsDataURL(file)
-              }}
-            />
-            {/* アバタープレビューポップアップ */}
-            {showAvatarPicker && (
-              <div style={{
-                position: 'absolute',
-                bottom: 'calc(100% + 12px)',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                background: '#1e1e2e',
-                border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 16,
-                padding: '16px',
-                boxShadow: '0 -8px 32px rgba(0,0,0,0.5)',
-                zIndex: 100,
-                minWidth: 200,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-                alignItems: 'center',
-              }}>
-                {/* 現在のアバタープレビュー */}
-                <div style={{
-                  width: 72, height: 72, borderRadius: '50%',
-                  background: userAvatar ? 'transparent' : 'var(--accent-gradient)',
-                  overflow: 'hidden',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: '3px solid #6366f1',
-                  flexShrink: 0,
-                }}>
-                  {userAvatar ? (
-                    <img src={userAvatar} alt="現在のアイコン" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <span style={{ fontSize: '1.6rem', fontWeight: 700, color: 'white' }}>?</span>
+                  {listenerMembers.length > 30 && (
+                    <div className={styles.moreListeners}>+{listenerMembers.length - 30}</div>
                   )}
                 </div>
-                <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
-                  画像をアップロードしてアイコンに設定
-                </p>
-                {/* アップロードボタン */}
+              </section>
+            </div>
+
+            {/* モバイル専用：右下フローティングボタン（ドロワーを開く） */}
+            <button
+              className={styles.floatingPanelBtn}
+              onClick={() => setDrawerOpen(true)}
+              title="チャット・YouTube・参加者を開く"
+              aria-label="パネルを開く"
+            >
+              {activeTab === 'participants' ? '👥' : activeTab === 'bgm' ? '🎵' : '💬'}
+            </button>
+
+            {/* モバイル用ドロワーオーバーレイ（背景タップで閉じる） */}
+            {drawerOpen && (
+              <div
+                className={styles.drawerOverlay}
+                onClick={() => setDrawerOpen(false)}
+              />
+            )}
+
+            {/* サイドパネル（デスクトップ：右固定 / モバイル：下からドロワー） */}
+            <aside className={`${styles.sidePanel} ${drawerOpen ? styles.drawerOpen : ''}`}>
+              <div className={styles.sidePanelTabs}>
                 <button
-                  onClick={() => fileInputRef.current?.click()}
-                  style={{
-                    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                    border: 'none',
-                    borderRadius: 10,
-                    padding: '9px 18px',
-                    color: 'white',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    width: '100%',
-                  }}
+                  className={`${styles.sidePanelTab} ${activeTab === 'chat' ? styles.active : ''}`}
+                  onClick={() => setActiveTab('chat')}
                 >
-                  📁 画像を選択する
+                  💬 チャット
                 </button>
-                {/* リセットボタン */}
-                {userAvatar && (
+                <button
+                  className={`${styles.sidePanelTab} ${activeTab === 'participants' ? styles.active : ''}`}
+                  onClick={() => setActiveTab('participants')}
+                >
+                  👥 参加者
+                </button>
+                <button
+                  className={`${styles.sidePanelTab} ${activeTab === 'bgm' ? styles.active : ''}`}
+                  onClick={() => setActiveTab('bgm')}
+                >
+                  🎵 BGM
+                </button>
+              </div>
+
+              <div className={styles.sidePanelContent}>
+                {activeTab === 'chat' ? (
+                  /* チャットタブ */
+                  <div>
+                    {messages.map((msg) => (
+                      <div key={msg.id} className={styles.chatMessage}>
+                        <div className={styles.chatMessageHeader}>
+                          <span className={styles.chatUserName}>{msg.userName}</span>
+                          <span className={styles.chatTime}>{msg.time}</span>
+                        </div>
+                        <p className={styles.chatMessageText}>{msg.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : activeTab === 'bgm' ? (
+                  /* BGMタブ — ルーム内専用 */
+                  <BGMPlayer />
+                ) : (
+                  /* 参加者タブ — 音量スライダー付き */
+                  <div>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                      スピーカー ({room.speakers.length})
+                    </p>
+                    {room.speakers.map(s => (
+                      <div key={s.userId} style={{ padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
+                        {/* 参加者情報 */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 6 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--accent-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'white', flexShrink: 0 }}>
+                            {getInitials(s.displayName)}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <p style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{s.displayName}</p>
+                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                              {s.role === 'host' ? '👑 ホスト' : '🎙️ スピーカー'}{s.isSpeaking ? ' · 発話中...' : ''}
+                            </p>
+                          </div>
+                          <span style={{ fontSize: '0.9rem' }}>{s.isMuted ? '🔇' : '🎙️'}</span>
+                        </div>
+                        {/* 音量スライダー（自分以外のみ表示） */}
+                        {s.userId !== 'user_current' && (
+                          <RemoteVolumeControl
+                            participantIdentity={s.userId}
+                            displayName={s.displayName}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* チャット入力エリア */}
+              {activeTab === 'chat' && (
+                <div className={styles.chatInputArea}>
+                  <textarea
+                    value={chatMessage}
+                    onChange={e => setChatMessage(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        handleSendMessage()
+                      }
+                    }}
+                    placeholder="メッセージを入力... (Enter で送信)"
+                    className={styles.chatInput}
+                    rows={2}
+                  />
+                </div>
+              )}
+            </aside>
+          </div>
+
+          {/* コントロールバー（下部） */}
+          <footer className={styles.controlBar}>
+
+            {/* マイクボタン（スピーカーのみ有効） */}
+            {amISpeaker ? (
+              <MicrophoneSelector>
+                <button
+                  id="mute-toggle-btn"
+                  className={`${styles.controlBtn} ${styles.muteBtn} ${isMuted ? styles.muted : styles.unmuted}`}
+                  onClick={handleToggleMute}
+                  style={{ borderRadius: '8px 0 0 8px' }}
+                >
+                  <MicControl isMuted={isMuted} onToggle={handleToggleMute} />
+                  <span className={styles.controlBtnLabel}>{micLabel}</span>
+                </button>
+              </MicrophoneSelector>
+            ) : (
+              /* リスナーには聴いているだけバッジ */
+              <div className={styles.listenerBadge}>
+                <span>🎧</span>
+                <span className={styles.controlBtnLabel}>聴いています</span>
+              </div>
+            )}
+
+            {/* 手を挙げる（リスナーのみ） */}
+            {!amISpeaker && (
+              <button
+                id="hand-raise-btn"
+                className={`${styles.controlBtn} ${myHandRaised ? styles.active : ''}`}
+                onClick={handleHandRaise}
+              >
+                <span className={styles.controlBtnIcon}>✋</span>
+                <span className={styles.controlBtnLabel}>{myHandRaised ? '手を下げる' : '発言リクエスト'}</span>
+              </button>
+            )}
+
+            {/* リアクションボタン */}
+            <div ref={reactionBtnRef} style={{ position: 'relative' }}>
+              {showReactions && <ReactionPanel onClose={() => setShowReactions(false)} />}
+              <button
+                id="reaction-btn"
+                className={styles.controlBtn}
+                onClick={() => setShowReactions(prev => !prev)}
+              >
+                <span className={styles.controlBtnIcon}>😊</span>
+                <span className={styles.controlBtnLabel}>リアクション</span>
+              </button>
+            </div>
+
+            {/* アバター変更ボタン（画像アップロード対応） */}
+            <div ref={avatarBtnRef} style={{ position: 'relative' }}>
+              {/* 非表示のファイル入力 */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={e => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  const reader = new FileReader()
+                  reader.onload = ev => {
+                    if (ev.target?.result) {
+                      setUserAvatar(ev.target.result as string)
+                      setShowAvatarPicker(false)
+                    }
+                  }
+                  reader.readAsDataURL(file)
+                }}
+              />
+              {/* アバタープレビューポップアップ */}
+              {showAvatarPicker && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: 'calc(100% + 12px)',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: '#1e1e2e',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 16,
+                  padding: '16px',
+                  boxShadow: '0 -8px 32px rgba(0,0,0,0.5)',
+                  zIndex: 100,
+                  minWidth: 200,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
+                  alignItems: 'center',
+                }}>
+                  {/* 現在のアバタープレビュー */}
+                  <div style={{
+                    width: 72, height: 72, borderRadius: '50%',
+                    background: userAvatar ? 'transparent' : 'var(--accent-gradient)',
+                    overflow: 'hidden',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: '3px solid #6366f1',
+                    flexShrink: 0,
+                  }}>
+                    {userAvatar ? (
+                      <img src={userAvatar} alt="現在のアイコン" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <span style={{ fontSize: '1.6rem', fontWeight: 700, color: 'white' }}>?</span>
+                    )}
+                  </div>
+                  <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
+                    画像をアップロードしてアイコンに設定
+                  </p>
+                  {/* アップロードボタン */}
                   <button
-                    onClick={() => { setUserAvatar(null); setShowAvatarPicker(false) }}
+                    onClick={() => fileInputRef.current?.click()}
                     style={{
-                      background: 'transparent',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: 8,
-                      padding: '6px',
-                      color: 'var(--text-muted)',
-                      fontSize: '0.72rem',
+                      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                      border: 'none',
+                      borderRadius: 10,
+                      padding: '9px 18px',
+                      color: 'white',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
                       cursor: 'pointer',
                       width: '100%',
                     }}
                   >
-                    ✕ デフォルトに戻す
+                    📁 画像を選択する
                   </button>
-                )}
-              </div>
-            )}
+                  {/* リセットボタン */}
+                  {userAvatar && (
+                    <button
+                      onClick={() => { setUserAvatar(null); setShowAvatarPicker(false) }}
+                      style={{
+                        background: 'transparent',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 8,
+                        padding: '6px',
+                        color: 'var(--text-muted)',
+                        fontSize: '0.72rem',
+                        cursor: 'pointer',
+                        width: '100%',
+                      }}
+                    >
+                      ✕ デフォルトに戻す
+                    </button>
+                  )}
+                </div>
+              )}
+              <button
+                id="avatar-btn"
+                className={styles.controlBtn}
+                onClick={() => setShowAvatarPicker(prev => !prev)}
+                title="アイコン画像を変更"
+              >
+                {/* アバタープレビュー（サムネイル） */}
+                <span className={styles.controlBtnIcon} style={{
+                  width: 28, height: 28, borderRadius: '50%',
+                  overflow: 'hidden', display: 'inline-flex',
+                  alignItems: 'center', justifyContent: 'center',
+                  background: userAvatar ? 'transparent' : 'var(--accent-gradient)',
+                  flexShrink: 0,
+                }}>
+                  {userAvatar ? (
+                    <img src={userAvatar} alt="アイコン" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    '🙂'
+                  )}
+                </span>
+                <span className={styles.controlBtnLabel}>アイコン</span>
+              </button>
+            </div>
+
+            {/* 💬 チャット（モバイルドロワーを開く） */}
             <button
-              id="avatar-btn"
+              id="chat-toggle-btn"
               className={styles.controlBtn}
-              onClick={() => setShowAvatarPicker(prev => !prev)}
-              title="アイコン画像を変更"
+              onClick={() => { setActiveTab('chat'); setDrawerOpen(prev => !prev) }}
             >
-              {/* アバタープレビュー（サムネイル） */}
-              <span className={styles.controlBtnIcon} style={{
-                width: 28, height: 28, borderRadius: '50%',
-                overflow: 'hidden', display: 'inline-flex',
-                alignItems: 'center', justifyContent: 'center',
-                background: userAvatar ? 'transparent' : 'var(--accent-gradient)',
-                flexShrink: 0,
-              }}>
-                {userAvatar ? (
-                  <img src={userAvatar} alt="アイコン" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  '🙂'
-                )}
-              </span>
-              <span className={styles.controlBtnLabel}>アイコン</span>
+              <span className={styles.controlBtnIcon}>💬</span>
+              <span className={styles.controlBtnLabel}>チャット</span>
             </button>
-          </div>
 
-          {/* 💬 チャット（モバイルドロワーを開く） */}
-          <button
-            id="chat-toggle-btn"
-            className={styles.controlBtn}
-            onClick={() => { setActiveTab('chat'); setDrawerOpen(prev => !prev) }}
-          >
-            <span className={styles.controlBtnIcon}>💬</span>
-            <span className={styles.controlBtnLabel}>チャット</span>
-          </button>
+            {/* 🔗 招待 */}
+            <button id="invite-btn" className={styles.controlBtn}
+              onClick={() => navigator.clipboard.writeText(window.location.href).then(() => alert('部屋のURLをコピーしました！'))}
+            >
+              <span className={styles.controlBtnIcon}>🔗</span>
+              <span className={styles.controlBtnLabel}>招待</span>
+            </button>
 
-          {/* 🔗 招待 */}
-          <button id="invite-btn" className={styles.controlBtn}
-            onClick={() => navigator.clipboard.writeText(window.location.href).then(() => alert('部屋のURLをコピーしました！'))}
-          >
-            <span className={styles.controlBtnIcon}>🔗</span>
-            <span className={styles.controlBtnLabel}>招待</span>
-          </button>
-
-          {/* 退出ボタン */}
-          <button
-            id="leave-room-btn"
-            className={styles.leaveBtn}
-            onClick={handleLeave}
-          >
-            🚪 退出する
-          </button>
-        </footer>
-      </div>
-    </LiveKitRoom>
+            {/* 退出ボタン */}
+            <button
+              id="leave-room-btn"
+              className={styles.leaveBtn}
+              onClick={handleLeave}
+            >
+              🚪 退出する
+            </button>
+          </footer>
+        </div>
+      </LiveKitRoom>
+    </>
   )
 }

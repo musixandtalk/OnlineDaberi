@@ -1,5 +1,6 @@
 // LiveKit トークン発行 API
-// ユーザーが部屋に入る際に、サーバー側で安全に認証トークンを生成して返す
+// role パラメーターで「host/moderator/speaker」→ canPublish=true
+//                       「listener」           → canPublish=false
 import { NextRequest, NextResponse } from 'next/server'
 import { AccessToken } from 'livekit-server-sdk'
 
@@ -7,6 +8,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const room = searchParams.get('room')
     const username = searchParams.get('username')
+    const role = searchParams.get('role') ?? 'listener'  // デフォルトはリスナー
 
     // パラメーターチェック
     if (!room || !username) {
@@ -27,22 +29,26 @@ export async function GET(request: NextRequest) {
         )
     }
 
+    // ロールに応じて送信権限を決定
+    // host / moderator / speaker → マイク送信可
+    // listener                   → 受信のみ（マイク送信不可）
+    const canPublish = ['host', 'moderator', 'speaker'].includes(role)
+
     // アクセストークンを生成
     const at = new AccessToken(apiKey, apiSecret, {
-        identity: username,       // ユーザーの識別子
-        name: username,           // 表示名
-        ttl: '1h',               // トークンの有効期限（1時間）
+        identity: username,
+        name: username,
+        ttl: '2h',
     })
 
-    // 部屋への接続権限を付与（音声・映像の送受信を許可）
     at.addGrant({
-        roomJoin: true,           // 部屋への参加を許可
-        room: room,               // 接続先の部屋名
-        canPublish: true,         // マイク音声の送信を許可
-        canSubscribe: true,       // 他者の音声の受信を許可
+        roomJoin: true,
+        room: room,
+        canPublish,          // ロールによって true/false
+        canSubscribe: true,  // 全員が他の人の音声を聞ける
+        canPublishData: true, // データチャンネル（チャット等）は全員可
     })
 
     const token = await at.toJwt()
-
-    return NextResponse.json({ token })
+    return NextResponse.json({ token, role, canPublish })
 }

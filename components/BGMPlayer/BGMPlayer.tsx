@@ -1,12 +1,13 @@
 'use client'
-// BGMミキサー（ルーム内専用）
-// YouTube IFrame Player で Lofi + 自然音を2系統ミックス再生。
-// YouTube URLを貼り付けるだけで再生 — APIキー不要・完全無料。
+// BGMプレイヤー（ルーム内専用）
+// ・URLを入力して▶で再生 → プレイヤーが展開表示
+// ・「閉じる」を押したら停止＆折りたたむ
+// ・YouTube IFrame API 使用（Data APIキー不要・無料）
 import { useState, useEffect, useRef, useCallback } from 'react'
 import styles from './BGMPlayer.module.css'
 
 // ─── 型定義 ────────────────────────────────────────
-interface Track { id: string; name: string; sub: string; flag: string }
+interface Track { id: string; name: string; flag: string }
 
 declare global {
   interface Window {
@@ -20,41 +21,27 @@ declare global {
 interface YTPlayer {
   playVideo(): void
   pauseVideo(): void
+  stopVideo(): void
   setVolume(v: number): void
   loadVideoById(id: string): void
   destroy(): void
 }
 
-// ─── キュレーション済みデフォルト ─────────────────
-const LOFI_TRACKS: Track[] = [
-  { id: 'jfKfPfyJRdk', name: 'Lofi Girl — Study Beats', sub: '24/7 ライブ', flag: '📚' },
-  { id: '5qap5aO4i9A', name: 'Lofi Girl — Sleep / Chill', sub: 'まったりモード', flag: '🌙' },
-  { id: 'DWcJFNfaw9c', name: 'Coffee Shop Radio', sub: 'カフェBGM', flag: '☕' },
-  { id: 'kgx4WGK0oNU', name: 'Chillhop Radio', sub: 'Jazzy Lofi', flag: '🐾' },
-  { id: '7NOSDKb0HlU', name: 'Studio Ghibli Piano', sub: 'ジブリBGM', flag: '🌿' },
+// ─── キュレーション済みトラック ────────────────────
+const PRESET_TRACKS: Track[] = [
+  { id: 'jfKfPfyJRdk', name: 'Lofi Girl — Study Beats', flag: '📚' },
+  { id: '5qap5aO4i9A', name: 'Lofi Girl — Sleep / Chill', flag: '🌙' },
+  { id: 'DWcJFNfaw9c', name: 'Coffee Shop Radio', flag: '☕' },
+  { id: 'kgx4WGK0oNU', name: 'Chillhop Radio', flag: '🐾' },
+  { id: '7NOSDKb0HlU', name: 'Studio Ghibli Piano', flag: '🌿' },
+  { id: 'y1bXO_H_MBQ', name: '森の鳥の声', flag: '🐦' },
+  { id: 'xNN7iTA57jM', name: '雨と鳥の声', flag: '🌧️' },
 ]
 
-const NATURE_TRACKS: Track[] = [
-  { id: 'y1bXO_H_MBQ', name: '森の鳥の声', sub: '朝の森アンビエント', flag: '🐦' },
-  { id: 'xNN7iTA57jM', name: '雨と鳥の声', sub: 'レインフォレスト', flag: '🌧️' },
-  { id: 'eKFTSSKCzWA', name: '川のせせらぎ + 鳥', sub: '自然のサウンド', flag: '🏞️' },
-  { id: 'lFcSrYw2tYU', name: '海辺の鳥の声', sub: 'オーシャンアンビ', flag: '🌊' },
-]
-
-const BAR_COUNT = 18
-
-// ─── YouTube URL / ID からビデオIDを抽出 ─────────
-// 対応フォーマット:
-//   https://www.youtube.com/watch?v=XXXX
-//   https://youtu.be/XXXX
-//   https://www.youtube.com/live/XXXX
-//   https://www.youtube.com/embed/XXXX
-//   https://www.youtube.com/shorts/XXXX
-//   XXXXXXXXXXX（11文字のIDをそのまま）
+// ─── YouTube URL からビデオIDを抽出 ───────────────
 function extractVideoId(input: string): string | null {
   const s = input.trim()
   if (!s) return null
-
   const patterns = [
     /[?&]v=([a-zA-Z0-9_-]{11})/,
     /youtu\.be\/([a-zA-Z0-9_-]{11})/,
@@ -68,7 +55,7 @@ function extractVideoId(input: string): string | null {
   return null
 }
 
-// ─── YT IFrame API をページに一度だけロード ───────
+// ─── YT IFrame API を1度だけロード ───────────────
 let ytApiLoaded = false
 function loadYTApi(): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve()
@@ -83,259 +70,256 @@ function loadYTApi(): Promise<void> {
   })
 }
 
+const BAR_COUNT = 16
+
 // ─── コンポーネント ───────────────────────────────
 export default function BGMPlayer() {
-  const [isPlaying, setIsPlaying] = useState(false)
   const [apiReady, setApiReady] = useState(false)
-  const [lofiTrack, setLofiTrack] = useState(LOFI_TRACKS[0])
-  const [natureTrack, setNatureTrack] = useState(NATURE_TRACKS[0])
-  const [lofiVol, setLofiVol] = useState(65)
-  const [natureVol, setNatureVol] = useState(45)
-
-  // URL入力フィールド
-  const [lofiUrl, setLofiUrl] = useState('')
-  const [lofiErr, setLofiErr] = useState('')
-  const [natureUrl, setNatureUrl] = useState('')
-  const [natureErr, setNatureErr] = useState('')
-
-  // 波形バー
+  const [urlInput, setUrlInput] = useState('')
+  const [urlErr, setUrlErr] = useState('')
+  const [isOpen, setIsOpen] = useState(false)   // プレイヤーが展開しているか
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [volume, setVolume] = useState(70)
+  const [nowPlaying, setNowPlaying] = useState<Track | null>(null)
   const [waveBars, setWaveBars] = useState<number[]>(Array(BAR_COUNT).fill(0))
 
-  const lofiPlayerRef = useRef<YTPlayer | null>(null)
-  const naturePlayerRef = useRef<YTPlayer | null>(null)
-  const waveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const playerRef = useRef<YTPlayer | null>(null)
+  const waveTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // YT API の非同期ロード
   useEffect(() => {
     loadYTApi().then(() => setApiReady(true))
     return () => {
-      if (waveTimerRef.current) clearInterval(waveTimerRef.current)
-      lofiPlayerRef.current?.destroy()
-      naturePlayerRef.current?.destroy()
+      if (waveTimer.current) clearInterval(waveTimer.current)
+      playerRef.current?.destroy()
     }
   }, [])
 
-  // ─── プレイヤー初期化 ────────────────────────────
-  const initPlayers = useCallback((lofiId: string, natureId: string) => {
-    if (!window.YT?.Player) return
-    lofiPlayerRef.current = new window.YT.Player('yt-lofi-player', {
-      height: '1', width: '1', videoId: lofiId,
-      playerVars: { autoplay: 1, loop: 1, playlist: lofiId, controls: 0, modestbranding: 1 },
-      events: { onReady: (e: { target: YTPlayer }) => { e.target.setVolume(lofiVol); e.target.playVideo() } },
-    })
-    naturePlayerRef.current = new window.YT.Player('yt-nature-player', {
-      height: '1', width: '1', videoId: natureId,
-      playerVars: { autoplay: 1, loop: 1, playlist: natureId, controls: 0, modestbranding: 1 },
-      events: { onReady: (e: { target: YTPlayer }) => { e.target.setVolume(natureVol); e.target.playVideo() } },
-    })
-  }, [lofiVol, natureVol])
-
-  // ─── 波形アニメ ────────────────────────────────
+  // ─── 波形アニメーション ──────────────────────────
   const startWave = () => {
-    waveTimerRef.current = setInterval(() => {
+    waveTimer.current = setInterval(() => {
       setWaveBars(Array.from({ length: BAR_COUNT }, () => Math.random()))
-    }, 110)
+    }, 120)
   }
   const stopWave = () => {
-    if (waveTimerRef.current) clearInterval(waveTimerRef.current)
+    if (waveTimer.current) clearInterval(waveTimer.current)
     setWaveBars(Array(BAR_COUNT).fill(0))
   }
 
-  // ─── 再生 / 停止トグル ──────────────────────────
-  const handleToggle = useCallback(() => {
+  // ─── プレイヤー初期化してビデオをロード ────────
+  const startVideo = useCallback((videoId: string, track: Track) => {
+    if (!window.YT?.Player) return
+
+    if (playerRef.current) {
+      // 既存プレイヤーに新しいビデオをロード
+      playerRef.current.loadVideoById(videoId)
+      playerRef.current.setVolume(volume)
+    } else {
+      // 初回: プレイヤーを生成
+      playerRef.current = new window.YT.Player('yt-bgm-player', {
+        height: '1', width: '1', videoId,
+        playerVars: {
+          autoplay: 1, loop: 1, playlist: videoId,
+          controls: 0, modestbranding: 1, rel: 0,
+        },
+        events: {
+          onReady: (e: { target: YTPlayer }) => {
+            e.target.setVolume(volume)
+            e.target.playVideo()
+          },
+          onStateChange: (e: { data: number }) => {
+            // 再生中: 1, 一時停止: 2
+            if (e.data === 1) { setIsPlaying(true); startWave() }
+            if (e.data === 2) { setIsPlaying(false); stopWave() }
+          },
+        },
+      })
+    }
+
+    setNowPlaying(track)
+    setIsOpen(true)
+    setIsPlaying(true)
+    startWave()
+  }, [volume])
+
+  // ─── URL 入力 → 再生 ─────────────────────────────
+  const handlePlay = useCallback(() => {
     if (!apiReady) return
+    const id = extractVideoId(urlInput)
+    if (!id) { setUrlErr('有効なYouTube URLを入力してください'); return }
+    setUrlErr('')
+    const track: Track = {
+      id,
+      name: urlInput.length > 40 ? urlInput.slice(0, 40) + '…' : urlInput,
+      flag: '🔗',
+    }
+    setUrlInput('')
+    startVideo(id, track)
+  }, [apiReady, urlInput, startVideo])
+
+  // ─── プリセットから選択 ───────────────────────────
+  const handlePreset = useCallback((track: Track) => {
+    if (!apiReady) return
+    startVideo(track.id, track)
+  }, [apiReady, startVideo])
+
+  // ─── 一時停止 / 再開 ──────────────────────────────
+  const handlePauseResume = useCallback(() => {
+    if (!playerRef.current) return
     if (isPlaying) {
-      lofiPlayerRef.current?.pauseVideo()
-      naturePlayerRef.current?.pauseVideo()
+      playerRef.current.pauseVideo()
       stopWave()
       setIsPlaying(false)
     } else {
-      if (!lofiPlayerRef.current) {
-        initPlayers(lofiTrack.id, natureTrack.id)
-      } else {
-        lofiPlayerRef.current.playVideo()
-        naturePlayerRef.current?.playVideo()
-      }
+      playerRef.current.playVideo()
       startWave()
       setIsPlaying(true)
     }
-  }, [apiReady, isPlaying, initPlayers, lofiTrack.id, natureTrack.id])
+  }, [isPlaying])
 
-  // ─── URL貼り付け → トラック変更 ────────────────
-  const applyUrl = useCallback((raw: string, type: 'lofi' | 'nature') => {
-    const id = extractVideoId(raw)
-    if (!id) {
-      if (type === 'lofi') setLofiErr('有効なYouTube URLを入力してください')
-      else setNatureErr('有効なYouTube URLを入力してください')
-      return
-    }
-    const track: Track = { id, name: raw.length > 36 ? raw.slice(0, 36) + '…' : raw, sub: 'カスタムURL', flag: '🔗' }
-    if (type === 'lofi') {
-      setLofiErr(''); setLofiTrack(track); setLofiUrl('')
-      if (lofiPlayerRef.current) { lofiPlayerRef.current.loadVideoById(id); lofiPlayerRef.current.setVolume(lofiVol) }
-    } else {
-      setNatureErr(''); setNatureTrack(track); setNatureUrl('')
-      if (naturePlayerRef.current) { naturePlayerRef.current.loadVideoById(id); naturePlayerRef.current.setVolume(natureVol) }
-    }
-  }, [lofiVol, natureVol])
+  // ─── 閉じる（停止 + 折りたたむ） ────────────────
+  const handleClose = useCallback(() => {
+    playerRef.current?.stopVideo()
+    stopWave()
+    setIsPlaying(false)
+    setIsOpen(false)
+    setNowPlaying(null)
+  }, [])
 
-  // ─── キュレーション済みトラック選択 ─────────────
-  const selectTrack = useCallback((track: Track, type: 'lofi' | 'nature') => {
-    if (type === 'lofi') {
-      setLofiTrack(track)
-      lofiPlayerRef.current?.loadVideoById(track.id)
-      lofiPlayerRef.current?.setVolume(lofiVol)
-    } else {
-      setNatureTrack(track)
-      naturePlayerRef.current?.loadVideoById(track.id)
-      naturePlayerRef.current?.setVolume(natureVol)
-    }
-  }, [lofiVol, natureVol])
-
-  // 音量変更
-  const handleLofiVol = (v: number) => { setLofiVol(v); lofiPlayerRef.current?.setVolume(v) }
-  const handleNatureVol = (v: number) => { setNatureVol(v); naturePlayerRef.current?.setVolume(v) }
+  // ─── 音量変更 ────────────────────────────────────
+  const handleVolume = (v: number) => {
+    setVolume(v)
+    playerRef.current?.setVolume(v)
+  }
 
   return (
-    <div className={styles.mixer}>
-      {/* 非表示 YouTube プレイヤー */}
-      <div className={styles.hiddenPlayers} aria-hidden>
-        <div id="yt-lofi-player" />
-        <div id="yt-nature-player" />
+    <div className={styles.bgmPlayer}>
+      {/* 非表示 YouTube プレイヤー DOM */}
+      <div className={styles.hiddenPlayer} aria-hidden>
+        <div id="yt-bgm-player" />
       </div>
 
-      {/* ─── 波形 + 再生ボタン ─── */}
-      <div className={styles.visualHeader}>
-        <div className={styles.waveform}>
-          {waveBars.map((v, i) => (
-            <div key={i}
-              className={`${styles.waveBar} ${isPlaying ? styles.active : ''}`}
-              style={{ height: isPlaying ? `${15 + v * 85}%` : '15%', '--spd': `${0.35 + (i % 5) * 0.1}s` } as React.CSSProperties}
-            />
-          ))}
-        </div>
-        <div className={styles.nowPlaying}>
-          <div className={`${styles.nowPlayingDot} ${!isPlaying ? styles.paused : ''}`} />
-          <div className={styles.nowPlayingInfo}>
-            <p className={styles.nowPlayingTitle}>{lofiTrack.flag} {lofiTrack.name}</p>
-            <p className={styles.nowPlayingLabel}>{isPlaying ? '▶ Lo-fi + 自然音ミックス中' : '⏸ 停止中'}</p>
-          </div>
+      {/* ─── URL入力エリア（常に表示） ─── */}
+      <div className={styles.inputArea}>
+        <p className={styles.inputLabel}>🎵 YouTube BGM</p>
+        <div className={styles.inputRow}>
+          <input
+            type="text"
+            className={styles.urlInput}
+            placeholder="YouTube URLを貼り付けて再生..."
+            value={urlInput}
+            onChange={e => { setUrlInput(e.target.value); setUrlErr('') }}
+            onKeyDown={e => { if (e.key === 'Enter') handlePlay() }}
+          />
           <button
-            className={`${styles.playBtn} ${isPlaying ? styles.playing : ''}`}
-            onClick={handleToggle} disabled={!apiReady}
+            className={styles.playStartBtn}
+            onClick={handlePlay}
+            disabled={!apiReady || !urlInput.trim()}
+            title="再生"
           >
-            {isPlaying ? '⏸' : '▶'}
+            ▶
           </button>
         </div>
-      </div>
+        {urlErr && <p className={styles.urlErr}>⚠️ {urlErr}</p>}
 
-      {/* ─── 音量スライダー ─── */}
-      <div className={styles.mixerSliders}>
-        <div className={styles.sliderRow}>
-          <div className={styles.sliderHeader}>
-            <span className={styles.sliderLabel}>🎹 Lo-fi</span>
-            <span className={styles.sliderVal}>{lofiVol}%</span>
-          </div>
-          <input type="range" min={0} max={100} value={lofiVol}
-            className={`${styles.slider} ${styles.sliderLofi}`}
-            style={{ '--pct': `${lofiVol}%` } as React.CSSProperties}
-            onChange={e => handleLofiVol(Number(e.target.value))} />
-        </div>
-        {/* 🐦 自然音スライダー（一時非表示） */}
-        <div style={{ display: 'none' }}>
-          <div className={styles.sliderRow}>
-            <div className={styles.sliderHeader}>
-              <span className={styles.sliderLabel}>🐦 自然音</span>
-              <span className={styles.sliderVal}>{natureVol}%</span>
-            </div>
-            <input type="range" min={0} max={100} value={natureVol}
-              className={`${styles.slider} ${styles.sliderBird}`}
-              style={{ '--pct': `${natureVol}%` } as React.CSSProperties}
-              onChange={e => handleNatureVol(Number(e.target.value))} />
-          </div>
-        </div>
-      </div>
-
-      {/* ─── スクロールエリア ─── */}
-      <div className={styles.scrollArea}>
-
-        {/* Lo-fi URL入力 */}
-        <div className={styles.inputPanel}>
-          <p className={styles.inputPanelLabel}>🎹 カスタムLo-fi URL</p>
-          <div className={styles.urlRow}>
-            <input
-              type="text"
-              placeholder="https://www.youtube.com/watch?v=..."
-              value={lofiUrl}
-              onChange={e => { setLofiUrl(e.target.value); setLofiErr('') }}
-              onKeyDown={e => { if (e.key === 'Enter') applyUrl(lofiUrl, 'lofi') }}
-              className={styles.urlInput}
-            />
-            <button className={styles.urlBtn} onClick={() => applyUrl(lofiUrl, 'lofi')} title="セット">▶</button>
-          </div>
-          {lofiErr && <p className={styles.urlErr}>⚠️ {lofiErr}</p>}
-        </div>
-
-        {/* Lo-fi トラック一覧 */}
-        <div className={styles.section}>
-          <p className={styles.sectionLabel}>🎵 おすすめ Lo-fi</p>
-          <div className={styles.trackList}>
-            {LOFI_TRACKS.map(t => (
-              <div key={t.id}
-                className={`${styles.trackItem} ${lofiTrack.id === t.id ? styles.selected : ''}`}
-                onClick={() => selectTrack(t, 'lofi')}
-              >
-                <span className={styles.trackPlayingIcon}>{lofiTrack.id === t.id && isPlaying ? '🎵' : ''}</span>
-                <span className={styles.trackFlag}>{t.flag}</span>
-                <div className={styles.trackInfo}>
-                  <p className={styles.trackName}>{t.name}</p>
-                  <p className={styles.trackSub}>{t.sub}</p>
-                </div>
+        {/* プリセットボタンリスト */}
+        <div className={styles.presets} style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 2 }}>⭐ おすすめBGM</p>
+          {PRESET_TRACKS.map(t => (
+            <button
+              key={t.id}
+              className={`${styles.presetBtn} ${nowPlaying?.id === t.id ? styles.presetActive : ''}`}
+              onClick={() => handlePreset(t)}
+              title={t.name}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                background: nowPlaying?.id === t.id ? 'var(--accent-primary)' : 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10,
+                fontSize: '0.82rem', color: nowPlaying?.id === t.id ? 'white' : 'var(--text-secondary)',
+                cursor: 'pointer', transition: 'all 0.2s', width: '100%', textAlign: 'left',
+                boxShadow: nowPlaying?.id === t.id ? '0 4px 12px rgba(124, 58, 237, 0.3)' : 'none'
+              }}
+              onMouseEnter={e => {
+                if (nowPlaying?.id !== t.id) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
+                  e.currentTarget.style.color = 'var(--text-primary)'
+                }
+              }}
+              onMouseLeave={e => {
+                if (nowPlaying?.id !== t.id) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
+                  e.currentTarget.style.color = 'var(--text-secondary)'
+                }
+              }}
+            >
+              <div style={{
+                background: nowPlaying?.id === t.id ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.05)',
+                width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.9rem', flexShrink: 0
+              }}>
+                <span style={{ filter: nowPlaying?.id === t.id ? 'none' : 'grayscale(0.8)' }}>{t.flag}</span>
               </div>
-            ))}
-          </div>
+              <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: nowPlaying?.id === t.id ? 700 : 500 }}>
+                {t.name}
+              </span>
+              {nowPlaying?.id === t.id && (
+                <span style={{ fontSize: '0.8rem', animation: 'playing-pulse 1s infinite alternate' }}>🎵</span>
+              )}
+            </button>
+          ))}
         </div>
+      </div>
 
-        {/* 🌿 自然音 URL入力（一時非表示） */}
-        <div style={{ display: 'none' }}>
-          <div className={styles.inputPanel}>
-            <p className={styles.inputPanelLabel}>🌿 カスタム自然音 URL</p>
-            <div className={styles.urlRow}>
-              <input
-                type="text"
-                placeholder="https://www.youtube.com/watch?v=..."
-                value={natureUrl}
-                onChange={e => { setNatureUrl(e.target.value); setNatureErr('') }}
-                onKeyDown={e => { if (e.key === 'Enter') applyUrl(natureUrl, 'nature') }}
-                className={styles.urlInput}
-              />
-              <button className={styles.urlBtn} onClick={() => applyUrl(natureUrl, 'nature')} title="セット">▶</button>
-            </div>
-            {natureErr && <p className={styles.urlErr}>⚠️ {natureErr}</p>}
-          </div>
-        </div>
-
-        {/* 🌿 自然音トラック一覧（一時非表示） */}
-        <div style={{ display: 'none' }}>
-          <div className={styles.section}>
-            <p className={styles.sectionLabel}>🌿 おすすめ自然音</p>
-            <div className={styles.trackList}>
-              {NATURE_TRACKS.map(t => (
-                <div key={t.id}
-                  className={`${styles.trackItem} ${natureTrack.id === t.id ? styles.selected : ''}`}
-                  onClick={() => selectTrack(t, 'nature')}
-                >
-                  <span className={styles.trackPlayingIcon}>{natureTrack.id === t.id && isPlaying ? '🎵' : ''}</span>
-                  <span className={styles.trackFlag}>{t.flag}</span>
-                  <div className={styles.trackInfo}>
-                    <p className={styles.trackName}>{t.name}</p>
-                    <p className={styles.trackSub}>{t.sub}</p>
-                  </div>
-                </div>
+      {/* ─── プレイヤーパネル（再生中のみ展開） ─── */}
+      <div className={`${styles.playerPanel} ${isOpen ? styles.playerPanelOpen : ''}`}>
+        {isOpen && nowPlaying && (
+          <>
+            {/* 波形バー */}
+            <div className={styles.waveform}>
+              {waveBars.map((v, i) => (
+                <div key={i}
+                  className={`${styles.waveBar} ${isPlaying ? styles.waveBarActive : ''}`}
+                  style={{ height: `${15 + v * 85}%`, animationDuration: `${0.4 + (i % 5) * 0.1}s` }}
+                />
               ))}
             </div>
-          </div>
-        </div>
 
+            {/* NOW PLAYING バー */}
+            <div className={styles.nowPlayingBar}>
+              <span className={styles.nowPlayingFlag}>{nowPlaying.flag}</span>
+              <span className={styles.nowPlayingName}>{nowPlaying.name}</span>
+
+              <div className={styles.controls}>
+                {/* 一時停止 / 再開 */}
+                <button
+                  className={styles.controlBtn}
+                  onClick={handlePauseResume}
+                  title={isPlaying ? '一時停止' : '再開'}
+                >
+                  {isPlaying ? '⏸' : '▶'}
+                </button>
+
+                {/* 音量スライダー */}
+                <input
+                  type="range" min={0} max={100} value={volume}
+                  className={styles.volSlider}
+                  style={{ '--pct': `${volume}%` } as React.CSSProperties}
+                  onChange={e => handleVolume(Number(e.target.value))}
+                  title={`音量: ${volume}%`}
+                />
+
+                {/* 閉じる（停止）ボタン */}
+                <button
+                  className={styles.closeBtn}
+                  onClick={handleClose}
+                  title="BGMを停止して閉じる"
+                >
+                  ⏹
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

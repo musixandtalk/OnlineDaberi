@@ -62,7 +62,6 @@
   flex-shrink: 0;
 }
 
-/* クラブバッジ */
 .clubBadge {
   display: inline-flex;
   align-items: center;
@@ -77,8 +76,15 @@
 }
 
 /* タイトル・説明 */
+.contentArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .cardTitle {
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.4;
@@ -86,7 +92,7 @@
 }
 
 .cardDescription {
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   color: var(--text-secondary);
   line-height: 1.5;
   display: -webkit-box;
@@ -95,161 +101,62 @@
   overflow: hidden;
 }
 
-/* スピーカーエリア */
-.speakerSection {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.speakerLabel {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.speakerList {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-/* スピーカーアイテム */
-.speakerItem {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.speakerAvatar {
-  position: relative;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--accent-gradient);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: white;
-  flex-shrink: 0;
-  border: 2px solid transparent;
-  transition: border-color var(--transition-fast);
-}
-
-.speakerAvatar.speaking {
-  border-color: var(--accent-primary);
-  animation: speaking-pulse 2s ease-in-out infinite;
-}
-
-.speakerMicIcon {
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  font-size: 0.6rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.speakerInfo {
-  display: flex;
-  flex-direction: column;
-}
-
-.speakerName {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.speakerRole {
-  font-size: 0.68rem;
-  color: var(--text-muted);
-}
-
-/* フッター（参加者数・タグ） */
+/* フッター（アバターと参加者数） */
 .cardFooter {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding-top: 10px;
+  margin-top: auto;
+  padding-top: 12px;
   border-top: 1px solid var(--border-color);
+}
+
+.speakerList {
+  display: flex;
+  align-items: center;
+  margin-left: 6px;
+}
+
+.simpleAvatar {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: white;
+  border: 2px solid var(--bg-card);
+  margin-left: -8px;
+  transition: transform var(--transition-fast);
+}
+
+.card:hover .simpleAvatar {
+  transform: translateY(-2px);
 }
 
 .statsRow {
   display: flex;
   align-items: center;
-  gap: 12px;
 }
 
 .stat {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.statIcon {
-  font-size: 0.85rem;
-}
-
-.tagList {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-}
-
-.tag {
-  padding: 2px 8px;
-  background: var(--bg-glass);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-full);
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  transition: all var(--transition-fast);
-}
-
-.card:hover .tag {
-  border-color: var(--border-accent);
-  color: var(--text-accent);
-}
-
-/* 参加ボタン */
-.joinBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 16px;
-  background: var(--accent-gradient);
-  color: white;
   font-size: 0.8rem;
+  color: var(--text-secondary);
   font-weight: 600;
-  border-radius: var(--border-radius-full);
-  white-space: nowrap;
-  transition: all var(--transition-fast);
-  box-shadow: 0 0 16px rgba(124, 58, 237, 0.25);
-}
-
-.card:hover .joinBtn {
-  box-shadow: 0 0 24px rgba(124, 58, 237, 0.4);
-  transform: scale(1.02);
+  display: flex;
+  align-items: center;
+  background: var(--bg-glass);
+  padding: 4px 10px;
+  border-radius: 20px;
 }
 
 /* 時間表示 */
 .timeAgo {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }

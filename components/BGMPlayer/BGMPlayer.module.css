@@ -1,395 +1,16 @@
 /* =============================================
-   BGMミキサー（YouTube IFrame 2系統ミックス）
+   BGMプレイヤー（ルーム内専用）
    ============================================= */
 
-.mixer {
+.bgmPlayer {
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden;
+  gap: 0;
 }
-
-/* スクロール可能エリア */
-.scrollArea {
-  flex: 1;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(124, 58, 237, 0.3) transparent;
-}
-
-.scrollArea::-webkit-scrollbar { width: 4px; }
-.scrollArea::-webkit-scrollbar-track { background: transparent; }
-.scrollArea::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 2px; }
-
-/* URL入力パネル */
-.inputPanel {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
-  background: rgba(0,0,0,0.08);
-}
-
-.inputPanelLabel {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  margin-bottom: 7px;
-}
-
-.urlRow {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.urlInput {
-  flex: 1;
-  padding: 8px 12px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
-  color: var(--text-primary);
-  font-size: 0.8rem;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-  font-family: inherit;
-}
-
-.urlInput:focus {
-  border-color: var(--border-accent);
-  box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
-  outline: none;
-}
-
-.urlInput::placeholder { color: var(--text-muted); font-size: 0.75rem; }
-
-.urlBtn {
-  padding: 8px 12px;
-  background: var(--accent-gradient);
-  border: none;
-  border-radius: var(--border-radius-md);
-  color: white;
-  font-size: 0.85rem;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all var(--transition-fast);
-  box-shadow: 0 2px 8px rgba(124,58,237,0.3);
-}
-
-.urlBtn:hover:not(:disabled) { opacity: 0.88; transform: scale(1.04); }
-.urlBtn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.urlErr {
-  margin-top: 5px;
-  font-size: 0.72rem;
-  color: #f87171;
-}
-
-.apiHint {
-  margin-top: 6px;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  line-height: 1.5;
-}
-
-.apiHint code {
-  background: rgba(0,0,0,0.3);
-  padding: 1px 4px;
-  border-radius: 3px;
-  font-size: 0.67rem;
-}
-
-
-/* ─── ビジュアルヘッダー ─── */
-.visualHeader {
-  padding: 16px 18px 12px;
-  background: linear-gradient(180deg, rgba(124,58,237,0.08) 0%, transparent 100%);
-  border-bottom: 1px solid var(--border-color);
-}
-
-/* NOW PLAYING 표示 */
-.nowPlaying {
-  padding: 10px 12px;
-  background: rgba(124, 58, 237, 0.08);
-  border: 1px solid rgba(124, 58, 237, 0.18);
-  border-radius: var(--border-radius-md);
-  margin-bottom: 12px;
-  min-height: 46px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.nowPlayingDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #22c55e;
-  flex-shrink: 0;
-  box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
-  animation: dotPulse 1.5s ease-in-out infinite;
-}
-
-.nowPlayingDot.paused {
-  background: var(--text-muted);
-  box-shadow: none;
-  animation: none;
-}
-
-@keyframes dotPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(0.8); }
-}
-
-.nowPlayingInfo {
-  flex: 1;
-  min-width: 0;
-}
-
-.nowPlayingTitle {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.nowPlayingLabel {
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-
-/* 再生/停止メインボタン */
-.playBtn {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--accent-gradient);
-  border: none;
-  color: white;
-  font-size: 1.2rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  box-shadow: 0 4px 16px rgba(124,58,237,0.4);
-  transition: all var(--transition-fast);
-}
-
-.playBtn:hover {
-  transform: scale(1.08);
-  box-shadow: 0 6px 22px rgba(124,58,237,0.55);
-}
-
-.playBtn.playing::after {
-  content: '';
-  position: absolute;
-  inset: -5px;
-  border-radius: 50%;
-  border: 2px solid rgba(124,58,237,0.4);
-  animation: ringOut 2s ease-in-out infinite;
-}
-
-@keyframes ringOut {
-  0%   { transform: scale(1); opacity: 1; }
-  100% { transform: scale(1.5); opacity: 0; }
-}
-
-/* 波形バー（装飾） */
-.waveform {
-  display: flex;
-  align-items: flex-end;
-  gap: 2.5px;
-  height: 28px;
-  margin-bottom: 4px;
-}
-
-.waveBar {
-  width: 4px;
-  border-radius: 2px 2px 0 0;
-  background: rgba(124, 58, 237, 0.3);
-  height: 20%;
-  transition: height 0.15s ease;
-}
-
-.waveBar.active {
-  background: var(--accent-gradient);
-  animation: waveFloat var(--spd) ease-in-out infinite alternate;
-}
-
-@keyframes waveFloat {
-  from { height: 15%; }
-  to   { height: 90%; }
-}
-
-/* ─── セクション共通 ─── */
-.section {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.sectionLabel {
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-/* ─── トラックリスト ─── */
-.trackList {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.trackItem {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: var(--border-radius-md);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  border: 1px solid transparent;
-  position: relative;
-}
-
-.trackItem:hover {
-  background: var(--bg-glass);
-  border-color: var(--border-color);
-}
-
-.trackItem.selected {
-  background: rgba(124, 58, 237, 0.1);
-  border-color: rgba(124, 58, 237, 0.25);
-}
-
-/* 再生中のアニメーションインジケーター */
-.trackPlayingIcon {
-  font-size: 0.85rem;
-  width: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.trackFlag {
-  font-size: 1rem;
-  flex-shrink: 0;
-}
-
-.trackInfo {
-  flex: 1;
-  min-width: 0;
-}
-
-.trackName {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.trackSub {
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  margin-top: 1px;
-}
-
-/* ─── ミキサースライダー ─── */
-.mixerSliders {
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.sliderRow {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.sliderHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.sliderLabel {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.sliderVal {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  min-width: 28px;
-  text-align: right;
-}
-
-.slider {
-  -webkit-appearance: none;
-  width: 100%;
-  height: 4px;
-  border-radius: 2px;
-  outline: none;
-  cursor: pointer;
-}
-
-.sliderLofi {
-  background: linear-gradient(
-    to right,
-    rgba(124, 58, 237, 0.85) 0%,
-    rgba(124, 58, 237, 0.85) var(--pct, 65%),
-    rgba(255,255,255,0.08) var(--pct, 65%)
-  );
-}
-
-.sliderBird {
-  background: linear-gradient(
-    to right,
-    rgba(34, 197, 94, 0.75) 0%,
-    rgba(34, 197, 94, 0.75) var(--pct, 45%),
-    rgba(255,255,255,0.08) var(--pct, 45%)
-  );
-}
-
-.slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid var(--bg-primary);
-  cursor: pointer;
-  box-shadow: 0 1px 5px rgba(0,0,0,0.5);
-  transition: transform var(--transition-fast);
-}
-
-.sliderLofi::-webkit-slider-thumb { background: var(--accent-primary); }
-.sliderBird::-webkit-slider-thumb { background: #22c55e; }
-
-.slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
 /* 非表示 YouTube プレイヤー */
-.hiddenPlayers {
+.hiddenPlayer {
   position: absolute;
   left: -9999px;
   width: 1px;
@@ -398,15 +19,262 @@
   pointer-events: none;
 }
 
-/* フッター */
-.footer {
-  padding: 10px 16px;
-  margin-top: auto;
+/* ─── URL入力エリア（常に表示） ─── */
+.inputArea {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
 }
 
-.footerText {
-  font-size: 0.67rem;
+.inputLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
   color: var(--text-muted);
-  text-align: center;
-  line-height: 1.6;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.inputRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.urlInput {
+  flex: 1;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  min-width: 0;
+}
+
+.urlInput:focus {
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+.urlInput::placeholder {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.playStartBtn {
+  padding: 9px 14px;
+  background: var(--accent-gradient);
+  border: none;
+  border-radius: var(--border-radius-md);
+  color: white;
+  font-size: 0.9rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+}
+
+.playStartBtn:hover:not(:disabled) {
+  opacity: 0.88;
+  transform: scale(1.05);
+}
+
+.playStartBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.urlErr {
+  font-size: 0.72rem;
+  color: #f87171;
+  margin-bottom: 6px;
+}
+
+/* プリセット絵文字ボタン */
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.presetBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--bg-glass);
+  font-size: 1.05rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  line-height: 1;
+}
+
+.presetBtn:hover {
+  background: var(--bg-glass-hover);
+  border-color: var(--border-accent);
+  transform: scale(1.1);
+}
+
+.presetActive {
+  background: rgba(124, 58, 237, 0.18);
+  border-color: rgba(124, 58, 237, 0.45);
+  box-shadow: 0 0 8px rgba(124, 58, 237, 0.25);
+}
+
+/* ─── プレイヤーパネル（折りたたみ） ─── */
+.playerPanel {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.25s ease;
+}
+
+.playerPanelOpen {
+  max-height: 200px;
+  opacity: 1;
+}
+
+/* ─── 波形バー ─── */
+.waveform {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 36px;
+  padding: 0 16px;
+  padding-top: 12px;
+}
+
+.waveBar {
+  flex: 1;
+  border-radius: 3px 3px 0 0;
+  background: rgba(124, 58, 237, 0.25);
+  height: 15%;
+  transition: height 0.12s ease;
+}
+
+.waveBarActive {
+  background: var(--accent-gradient);
+  animation: wavePulse var(--dur, 0.6s) ease-in-out infinite alternate;
+}
+
+@keyframes wavePulse {
+  from {
+    opacity: 0.6;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* ─── NOW PLAYING バー ─── */
+.nowPlayingBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 14px;
+  min-width: 0;
+}
+
+.nowPlayingFlag {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.nowPlayingName {
+  flex: 1;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* コントロールボタングループ */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.controlBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.controlBtn:hover {
+  background: var(--bg-glass-hover);
+  color: var(--text-primary);
+  border-color: var(--border-accent);
+}
+
+/* 閉じる（停止）ボタン — 赤みがかった警告色 */
+.closeBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #f87171;
+  font-size: 0.75rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.closeBtn:hover {
+  background: rgba(239, 68, 68, 0.22);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+}
+
+/* 音量スライダー */
+.volSlider {
+  -webkit-appearance: none;
+  width: 68px;
+  height: 3px;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  background: linear-gradient(to right,
+      rgba(124, 58, 237, 0.85) 0%,
+      rgba(124, 58, 237, 0.85) var(--pct, 70%),
+      rgba(255, 255, 255, 0.08) var(--pct, 70%));
+}
+
+.volSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  border: 2px solid var(--bg-primary);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }

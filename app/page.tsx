@@ -1,70 +1,36 @@
 'use client'
-// ホームページ — オンダベ（OnlineDaberi）のフィードUI
+// ホームページ — オンダベ（OnlineDaberi）シンプル版
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import Sidebar from '@/components/Sidebar/Sidebar'
 import RoomCard from '@/components/RoomCard/RoomCard'
-import { mockRooms, mockClubs, mockEvents } from '@/lib/mockData'
+import { mockRooms } from '@/lib/mockData'
 import type { Room } from '@/types'
 import styles from './page.module.css'
 
-// タブの定義
-const FILTER_TABS = [
-  { id: 'all', label: '🌐 すべて' },
-  { id: 'clubs', label: '🏛️ マイクラブ' },
-  { id: 'following', label: '❤️ フォロー中' },
-  { id: 'new', label: '🆕 新着' },
-]
-
-// クラブのイニシャルを取得
-const getInitials = (name: string) =>
-  name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-
-// イベント時刻のフォーマット
-const formatEventTime = (date: Date) => {
-  const hours = date.getHours().toString().padStart(2, '0')
-  const minutes = date.getMinutes().toString().padStart(2, '0')
-  const isToday = date.toDateString() === new Date().toDateString()
-  return {
-    time: `${hours}:${minutes}`,
-    day: isToday ? '今日' : '明日',
-  }
-}
-
 export default function HomePage() {
   const router = useRouter()
-  const [activeFilter, setActiveFilter] = useState('all')
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  // 検索クエリ
   const [searchQuery, setSearchQuery] = useState('')
-
-  // 部屋一覧（モック＋作成した部屋）
   const [rooms, setRooms] = useState<Room[]>(mockRooms)
-
-  // 部屋作成モーダルの状態
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showModal, setShowModal] = useState(false)
   const [newRoomName, setNewRoomName] = useState('')
   const [newRoomDesc, setNewRoomDesc] = useState('')
-  const [newRoomTags, setNewRoomTags] = useState('')
   const [isPublic, setIsPublic] = useState(true)
 
-  // フィルター + 検索で表示する部屋を絞り込む
+  // 検索フィルター
   const filteredRooms = rooms.filter(room => {
-    // 検索クエリがある場合はハイライトフィルター
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      return (
-        room.name.toLowerCase().includes(q) ||
-        room.description?.toLowerCase().includes(q) ||
-        room.hostName.toLowerCase().includes(q) ||
-        room.tags.some(t => t.toLowerCase().includes(q))
-      )
-    }
-    return true
+    const q = searchQuery.toLowerCase().trim()
+    if (!q) return true
+    return (
+      room.name.toLowerCase().includes(q) ||
+      room.description?.toLowerCase().includes(q) ||
+      room.hostName.toLowerCase().includes(q) ||
+      room.tags.some(t => t.toLowerCase().includes(q))
+    )
   })
 
-  // 部屋を作成してルームページに遷移
+  // 部屋を作成してルームページへ遷移
   const handleCreateRoom = () => {
     if (!newRoomName.trim()) return
     const roomId = `room_${Date.now()}`
@@ -78,31 +44,24 @@ export default function HomePage() {
       clubId: null,
       clubName: null,
       isPublic,
-      tags: newRoomTags.split('　').concat(newRoomTags.split(' ')).map(t => t.trim()).filter(Boolean),
-      // 作成者のみ（Bot なし）
+      tags: [],
       participantCount: 1,
       speakers: [
-        // 自分（ホスト）のみ
         { userId: 'user_current', username: 'guest', displayName: 'ゲストさん', avatarUrl: null, role: 'host', isMuted: true, isSpeaking: false, handRaised: false },
       ],
       listeners: [],
       livekitRoomName: roomId,
       createdAt: new Date(),
     }
-
-    // localStorage に保存して、ルームページから参照できるようにする
     try {
       const existing = JSON.parse(localStorage.getItem('created_rooms') ?? '[]')
       localStorage.setItem('created_rooms', JSON.stringify([newRoom, ...existing]))
-    } catch {
-      // localStorage が使えない環境では無視
-    }
+    } catch { /* 無視 */ }
 
     setRooms(prev => [newRoom, ...prev])
-    setShowCreateModal(false)
+    setShowModal(false)
     setNewRoomName('')
     setNewRoomDesc('')
-    setNewRoomTags('')
     router.push(`/room/${roomId}`)
   }
 
@@ -111,162 +70,63 @@ export default function HomePage() {
       {/* サイドバー（モバイルではドロワー） */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      {/* 部屋作成モーダル */}
-      {showCreateModal && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 1000,
-            background: 'rgba(0,0,0,0.7)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            backdropFilter: 'blur(6px)',
-          }}
-          onClick={e => { if (e.target === e.currentTarget) setShowCreateModal(false) }}
-        >
-          <div style={{
-            background: '#16162a',
-            border: '1px solid rgba(255,255,255,0.12)',
-            borderRadius: 20,
-            padding: '32px',
-            width: '100%',
-            maxWidth: 480,
-            boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 20,
-            animation: 'fadeUp 0.25s ease',
-          }}>
-            {/* ヘッダー */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                🎙️ 新しい部屋を作る
-              </h2>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' }}
-              >✕</button>
+      {/* ─── 部屋作成モーダル ─── */}
+      {showModal && (
+        <div className={styles.modalOverlay} onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
+          <div className={styles.modal}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>🎙️ 新しい部屋を作る</h2>
+              <button className={styles.modalClose} onClick={() => setShowModal(false)}>✕</button>
             </div>
 
-            {/* 部屋名（必須） */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                部屋名 <span style={{ color: '#f87171' }}>*</span>
-              </label>
+            {/* 部屋名 */}
+            <div className={styles.modalField}>
+              <label className={styles.modalLabel}>部屋名 <span className={styles.required}>*</span></label>
               <input
+                className={styles.modalInput}
                 type="text"
                 value={newRoomName}
                 onChange={e => setNewRoomName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleCreateRoom() }}
                 placeholder="例：今夜のAIニュースを語ろう 🤖"
                 maxLength={60}
-                style={{
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.14)',
-                  borderRadius: 10,
-                  padding: '11px 14px',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.9rem',
-                  outline: 'none',
-                  transition: 'border-color 0.2s',
-                }}
-                onFocus={e => (e.target.style.borderColor = '#6366f1')}
-                onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.14)')}
                 autoFocus
               />
-              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textAlign: 'right' }}>
-                {newRoomName.length}/60
-              </span>
+              <span className={styles.charCount}>{newRoomName.length}/60</span>
             </div>
 
-            {/* 説明（任意） */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                説明（任意）
-              </label>
+            {/* 説明 */}
+            <div className={styles.modalField}>
+              <label className={styles.modalLabel}>説明（任意）</label>
               <textarea
+                className={styles.modalInput}
                 value={newRoomDesc}
                 onChange={e => setNewRoomDesc(e.target.value)}
                 placeholder="どんな話をする部屋ですか？"
                 rows={3}
                 maxLength={200}
-                style={{
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.14)',
-                  borderRadius: 10,
-                  padding: '11px 14px',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.85rem',
-                  outline: 'none',
-                  resize: 'none',
-                  transition: 'border-color 0.2s',
-                }}
-                onFocus={e => (e.target.style.borderColor = '#6366f1')}
-                onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.14)')}
-              />
-            </div>
-
-            {/* タグ（任意） */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                タグ（スペース区切り、任意）
-              </label>
-              <input
-                type="text"
-                value={newRoomTags}
-                onChange={e => setNewRoomTags(e.target.value)}
-                placeholder="例：AI テック 雑談"
-                style={{
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.14)',
-                  borderRadius: 10,
-                  padding: '11px 14px',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.85rem',
-                  outline: 'none',
-                  transition: 'border-color 0.2s',
-                }}
-                onFocus={e => (e.target.style.borderColor = '#6366f1')}
-                onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.14)')}
               />
             </div>
 
             {/* 公開設定 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className={styles.modalToggleRow}>
               <button
+                className={`${styles.toggle} ${isPublic ? styles.toggleOn : ''}`}
                 onClick={() => setIsPublic(!isPublic)}
-                style={{
-                  width: 44, height: 24, borderRadius: 12,
-                  border: 'none', cursor: 'pointer',
-                  background: isPublic ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'rgba(255,255,255,0.12)',
-                  position: 'relative', transition: 'background 0.25s', flexShrink: 0,
-                }}
+                type="button"
               >
-                <span style={{
-                  position: 'absolute', top: 3, left: isPublic ? 22 : 3,
-                  width: 18, height: 18, borderRadius: '50%',
-                  background: 'white', transition: 'left 0.25s',
-                }} />
+                <span className={styles.toggleThumb} />
               </button>
-              <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                {isPublic ? '🌐 公開部屋（誰でも参加可能）' : '🔒 非公開部屋（招待制）'}
+              <span className={styles.modalLabel}>
+                {isPublic ? '🌐 公開部屋（誰でも参加可）' : '🔒 非公開部屋（招待制）'}
               </span>
             </div>
 
             {/* 作成ボタン */}
             <button
+              className={`${styles.createBtn} ${!newRoomName.trim() ? styles.createBtnDisabled : ''}`}
               onClick={handleCreateRoom}
               disabled={!newRoomName.trim()}
-              style={{
-                background: newRoomName.trim()
-                  ? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
-                  : 'rgba(255,255,255,0.08)',
-                border: 'none',
-                borderRadius: 12,
-                padding: '13px',
-                color: newRoomName.trim() ? 'white' : 'var(--text-muted)',
-                fontSize: '0.95rem',
-                fontWeight: 700,
-                cursor: newRoomName.trim() ? 'pointer' : 'not-allowed',
-                transition: 'all 0.2s',
-              }}
             >
               🎙️ 部屋を作ってだべる！
             </button>
@@ -274,209 +134,84 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* メインコンテンツエリア */}
+      {/* ─── メインコンテンツ ─── */}
       <main className={styles.mainContent}>
-        {/* スティッキーヘッダー */}
+        {/* ヘッダー */}
         <header className={styles.header}>
           <div className={styles.headerLeft}>
-            {/* モバイル用ハンバーガーボタン */}
+            {/* モバイル用ハンバーガー */}
             <button
               className={styles.hamburgerBtn}
               onClick={() => setSidebarOpen(true)}
               aria-label="メニューを開く"
+              type="button"
             >
               <span /><span /><span />
             </button>
-            <h1 className={styles.headerTitle}>はなしば</h1>
+            <h1 className={styles.headerTitle}>オンダベ</h1>
           </div>
-          <div className={styles.headerRight}>
-            {/* PC用：部屋作成ボタン */}
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="btn-primary"
-              style={{ padding: '8px 18px', fontSize: '0.85rem' }}
-            >
-              🎙️ 部屋を作る
-            </button>
+
+          {/* 検索バー（ヘッダー内） */}
+          <div className={styles.searchBar}>
+            <span className={styles.searchIcon}>🔍</span>
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="部屋・ホスト名で検索..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                className={styles.searchClear}
+                onClick={() => setSearchQuery('')}
+                aria-label="クリア"
+              >✕</button>
+            )}
           </div>
+
+          {/* 部屋作成ボタン */}
+          <button
+            className="btn-primary"
+            style={{ padding: '8px 18px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+            onClick={() => setShowModal(true)}
+          >
+            🎙️ 部屋を作る
+          </button>
         </header>
 
-        {/* ページコンテンツ */}
+        {/* ─── 部屋一覧 ─── */}
         <div className={styles.pageContent}>
-          {/* ヒーローカード（ウェルカムメッセージ） */}
-          <div className={styles.hero}>
-            <h2 className={styles.heroTitle}>おかえり、ゲストさん 👋</h2>
-            <p className={styles.heroSubtitle}>
-              今も誰かがだべってる。部屋を作って、気軽に話しかけてみよう。
-            </p>
-
-            <div className={styles.heroActions}>
-              <button
-                className="btn-primary"
-                onClick={() => setShowCreateModal(true)}
-              >🎙️ 部屋を作る</button>
-              <button className="btn-secondary">📅 だべり予定を入れる</button>
-            </div>
+          <div className={styles.sectionHeader}>
+            <span className={styles.sectionTitle}>
+              🔴 ライブ中
+              <span className="badge badge-live" style={{ marginLeft: 8 }}>{filteredRooms.length}</span>
+            </span>
           </div>
 
-
-
-          {/* フィルタータブ */}
-          <div className={styles.filterTabs}>
-            {FILTER_TABS.map(tab => (
-              <button
-                key={tab.id}
-                className={`${styles.filterTab} ${activeFilter === tab.id ? styles.filterTabActive : ''}`}
-                onClick={() => setActiveFilter(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* ライブ部屋セクション */}
-          <section>
-            <div className={styles.sectionHeader}>
-              <h2 className={styles.sectionTitle}>
-                🔴 ライブ中の部屋
-                <span className="badge badge-live">{filteredRooms.length}</span>
-              </h2>
-              <Link href="/rooms" className={styles.sectionLink}>
-                すべて見る →
-              </Link>
-            </div>
-
-            {/* 検索バー（ライブ部屋の直上） */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '9px 14px',
-              background: 'var(--bg-glass)',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--border-radius-full)',
-              marginBottom: 16,
-              transition: 'border-color 0.15s, box-shadow 0.15s',
-            }}
-              onFocus={() => { }} // focus 時にスタイル変えたい場合
-            >
-              <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>🔍</span>
-              <input
-                type="text"
-                placeholder="部屋・ホスト名・タグで検索..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                style={{
-                  flex: 1,
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.88rem',
-                  outline: 'none',
-                }}
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.85rem', flexShrink: 0 }}
-                  aria-label="検索をクリア"
-                >
-                  ✕
+          {filteredRooms.length === 0 ? (
+            <div className="empty-state">
+              <span className="empty-state-icon">{searchQuery ? '🔍' : '🎙️'}</span>
+              <p className="empty-state-text">
+                {searchQuery
+                  ? `「${searchQuery}」に一致する部屋が見つかりませんでした`
+                  : 'まだ部屋がありません。最初の部屋を作りましょう！'}
+              </p>
+              {!searchQuery && (
+                <button className="btn-primary" style={{ marginTop: 16 }} onClick={() => setShowModal(true)}>
+                  🎙️ 部屋を作る
                 </button>
               )}
             </div>
-
-            {/* 検索結果なし */}
-            {filteredRooms.length === 0 && (
-              <div className="empty-state">
-                <span className="empty-state-icon">🔍</span>
-                <p className="empty-state-text">「{searchQuery}」に一致する部屋が見つかりませんでした</p>
-              </div>
-            )}
-
+          ) : (
             <div className={styles.roomGrid}>
-              {filteredRooms.map((room) => (
+              {filteredRooms.map(room => (
                 <RoomCard key={room.id} room={room} />
               ))}
             </div>
-          </section>
-
-          {/* スケジュールイベントセクション */}
-          <section>
-            <div className={styles.sectionHeader}>
-              <h2 className={styles.sectionTitle}>📅 近日開催のイベント</h2>
-              <Link href="/events" className={styles.sectionLink}>
-                すべて見る →
-              </Link>
-            </div>
-
-            <div className={styles.eventList}>
-              {mockEvents.map((event) => {
-                const { time, day } = formatEventTime(event.scheduledAt)
-                return (
-                  <div key={event.id} className={styles.eventCard}>
-                    <div className={styles.eventTime}>
-                      <span className={styles.eventTimeHour}>{time}</span>
-                      <span className={styles.eventTimeDay}>{day}</span>
-                    </div>
-                    <div className={styles.eventInfo}>
-                      <h3 className={styles.eventTitle}>{event.title}</h3>
-                      <div className={styles.eventMeta}>
-                        <span className={styles.eventHost}>by {event.hostName}</span>
-                        {event.clubName && (
-                          <span className="badge badge-members">🏛️ {event.clubName}</span>
-                        )}
-                        <span className={styles.eventParticipants}>
-                          👥 {event.participantCount}人が参加予定
-                        </span>
-                      </div>
-                    </div>
-                    <button className={event.isJoined ? styles.eventJoinBtnJoined : styles.eventJoinBtnNotJoined}>
-                      {event.isJoined ? '✅ 参加済み' : '📅 参加する'}
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          </section>
-
-          {/* おすすめクラブセクション */}
-          <section>
-            <div className={styles.sectionHeader}>
-              <h2 className={styles.sectionTitle}>🏛️ おすすめのクラブ</h2>
-              <Link href="/clubs" className={styles.sectionLink}>
-                すべて見る →
-              </Link>
-            </div>
-
-            <div className={styles.clubGrid}>
-              {mockClubs.map((club) => (
-                <Link
-                  key={club.id}
-                  href={`/club/${club.slug}`}
-                  className={styles.clubCardItem}
-                >
-                  <div className={styles.clubCardImage}>
-                    {getInitials(club.name)}
-                  </div>
-                  <p className={styles.clubCardName}>{club.name}</p>
-                  <p className={styles.clubCardDesc}>{club.description}</p>
-                  <p className={styles.clubCardMembers}>
-                    👥 {club.memberCount.toLocaleString()}人のメンバー
-                  </p>
-                  <button
-                    className={club.isFollowing ? styles.clubFollowBtnFollowing : styles.clubFollowBtnNotFollowing}
-                    onClick={(e) => e.preventDefault()}
-                  >
-                    {club.isFollowing ? '✅ フォロー中' : '＋ フォロー'}
-                  </button>
-                </Link>
-              ))}
-            </div>
-          </section>
+          )}
         </div>
       </main>
     </div>
   )
 }
-

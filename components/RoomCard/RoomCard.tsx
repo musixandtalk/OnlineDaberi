@@ -26,89 +26,38 @@ export default function RoomCard({ room }: RoomCardProps) {
 
   return (
     <Link href={`/room/${room.id}`} className={styles.card}>
-      {/* ヘッダー：クラブバッジ・LIVEバッジ */}
+      {/* ヘッダー：LIVEバッジ・時間 */}
       <div className={styles.cardHeader}>
-        <div className={styles.cardMeta}>
-          <span className="badge badge-live">LIVE</span>
-          {room.clubName && (
-            <span className={styles.clubBadge}>🏛️ {room.clubName}</span>
-          )}
-        </div>
-        <div className={styles.cardActions}>
-          <span className={styles.timeAgo}>{formatTimeAgo(room.createdAt)}</span>
-        </div>
+        <span className="badge badge-live">LIVE</span>
+        <span className={styles.timeAgo}>{formatTimeAgo(room.createdAt)}</span>
       </div>
 
       {/* タイトル・説明 */}
-      <div>
+      <div className={styles.contentArea}>
         <h3 className={styles.cardTitle}>{room.name}</h3>
         {room.description && (
           <p className={styles.cardDescription}>{room.description}</p>
         )}
       </div>
 
-      {/* スピーカー一覧 */}
-      <div className={styles.speakerSection}>
-        <p className={styles.speakerLabel}>🎙️ スピーカー</p>
+      {/* フッター：アバター一覧と参加人数 */}
+      <div className={styles.cardFooter}>
         <div className={styles.speakerList}>
-          {displaySpeakers.map((speaker) => (
-            <div key={speaker.userId} className={styles.speakerItem}>
-              <div
-                className={`${styles.speakerAvatar} ${speaker.isSpeaking ? styles.speaking : ''}`}
-              >
-                {getInitials(speaker.displayName)}
-                {/* マイクアイコン */}
-                <span className={styles.speakerMicIcon}>
-                  {speaker.isMuted ? '🔇' : '🎙️'}
-                </span>
-              </div>
-              <div className={styles.speakerInfo}>
-                <span className={styles.speakerName}>{speaker.displayName}</span>
-                <span className={styles.speakerRole}>
-                  {speaker.role === 'host' ? 'ホスト' : 'スピーカー'}
-                </span>
-              </div>
+          {displaySpeakers.map((speaker, index) => (
+            <div key={speaker.userId} className={styles.simpleAvatar} style={{ zIndex: 10 - index }}>
+              {getInitials(speaker.displayName)}
             </div>
           ))}
           {hasMoreSpeakers && (
-            <div className={styles.speakerItem}>
-              <div className={styles.speakerAvatar} style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.7rem' }}>
-                +{room.speakers.length - 4}
-              </div>
+            <div className={styles.simpleAvatar} style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)', fontSize: '0.65rem' }}>
+              +{room.speakers.length - 4}
             </div>
           )}
         </div>
-      </div>
 
-      {/* フッター：統計・タグ・参加ボタン */}
-      <div className={styles.cardFooter}>
         <div className={styles.statsRow}>
-          <span className={styles.stat}>
-            <span className={styles.statIcon}>🎙️</span>
-            {room.speakers.length}
-          </span>
-          <span className={styles.stat}>
-            <span className={styles.statIcon}>🎧</span>
-            {room.listeners.length}
-          </span>
-          <span className={styles.stat}>
-            <span className={styles.statIcon}>👥</span>
-            {room.participantCount}人
-          </span>
+          <span className={styles.stat}>👥 {room.participantCount}人</span>
         </div>
-
-        <div className={styles.tagList}>
-          {room.tags.slice(0, 2).map(tag => (
-            <span key={tag} className={styles.tag}>#{tag}</span>
-          ))}
-        </div>
-      </div>
-
-      {/* 参加ボタン（ホバー時に表示感を強調） */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <span className={styles.joinBtn}>
-          🎙️ 参加する
-        </span>
       </div>
     </Link>
   )
