@@ -7,6 +7,7 @@
   flex-direction: column;
   height: 100%;
   gap: 0;
+  overflow: hidden; /* 全体のスクロールを防ぐ */
 }
 
 /* 非表示 YouTube プレイヤー */
@@ -21,6 +22,8 @@
 
 /* ─── URL入力エリア（常に表示） ─── */
 .inputArea {
+  flex: 1; /* 残りのスペースを埋める */
+  overflow-y: auto; /* ここだけスクロールさせる */
   padding: 16px;
   border-bottom: 1px solid var(--border-color);
 }
@@ -179,34 +182,40 @@
 /* ─── NOW PLAYING バー ─── */
 .nowPlayingBar {
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 16px 16px;
+}
+
+.nowPlayingInfo {
+  display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px 14px;
-  min-width: 0;
+  width: 100%;
 }
 
 .nowPlayingFlag {
-  font-size: 1rem;
+  font-size: 1.1rem;
   flex-shrink: 0;
 }
 
 .nowPlayingName {
   flex: 1;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
 }
 
 /* コントロールボタングループ */
 .controls {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
+  justify-content: space-between;
+  width: 100%;
+  gap: 10px;
 }
 
 .controlBtn {
@@ -257,7 +266,8 @@
 /* 音量スライダー */
 .volSlider {
   -webkit-appearance: none;
-  width: 68px;
+  flex: 1;
+  width: 100%;
   height: 3px;
   border-radius: 2px;
   outline: none;

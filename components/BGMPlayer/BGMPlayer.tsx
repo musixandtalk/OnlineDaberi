@@ -286,8 +286,10 @@ export default function BGMPlayer() {
 
             {/* NOW PLAYING バー */}
             <div className={styles.nowPlayingBar}>
-              <span className={styles.nowPlayingFlag}>{nowPlaying.flag}</span>
-              <span className={styles.nowPlayingName}>{nowPlaying.name}</span>
+              <div className={styles.nowPlayingInfo}>
+                <span className={styles.nowPlayingFlag}>{nowPlaying.flag}</span>
+                <span className={styles.nowPlayingName}>{nowPlaying.name}</span>
+              </div>
 
               <div className={styles.controls}>
                 {/* 一時停止 / 再開 */}
