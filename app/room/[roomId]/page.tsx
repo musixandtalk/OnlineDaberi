@@ -471,8 +471,14 @@ function ReactionPanel({ onClose }: { onClose: () => void }) {
   )
 }
 
-
 export default function RoomPage() {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  if (!mounted) return <div style={{ minHeight: '100vh', background: '#090b14' }} />
+  return <RoomPageContent />
+}
+
+function RoomPageContent() {
   const params = useParams()
   const router = useRouter()
   const roomId = params.roomId as string
