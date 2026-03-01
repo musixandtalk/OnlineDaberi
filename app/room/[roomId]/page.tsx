@@ -57,6 +57,47 @@ const MOCK_MESSAGES = [
   { id: 'm4', userId: 'u5', userName: 'Jake Mori', text: 'Cursor AIも合わせて使うと最強ですよ', time: '22:37' },
 ]
 
+// ─── 発話状態を監視するアバター ───
+function SpeakerAvatar({ lkParticipant, isMe, avatarUrl, displayName, memberRole, participantRole, isMuted }: any) {
+  if (!lkParticipant) return <AvatarView isSpeaking={false} isMe={isMe} avatarUrl={avatarUrl} displayName={displayName} memberRole={memberRole} participantRole={participantRole} isMuted={isMuted} />
+  return <SpeakerAvatarActive lkParticipant={lkParticipant} isMe={isMe} avatarUrl={avatarUrl} displayName={displayName} memberRole={memberRole} participantRole={participantRole} isMuted={isMuted} />
+}
+
+function SpeakerAvatarActive({ lkParticipant, ...props }: any) {
+  const isSpeaking = useIsSpeaking(lkParticipant)
+  return <AvatarView isSpeaking={isSpeaking} {...props} />
+}
+
+function AvatarView({ isSpeaking, isMe, avatarUrl, displayName, memberRole, participantRole, isMuted }: any) {
+  return (
+    <div
+      className={`${styles.bubbleAvatar} ${isSpeaking ? styles.speaking : ''}`}
+      style={isMe ? {
+        outline: isSpeaking ? '3px solid #ec4899' : '3px solid rgba(99, 102, 241, 0.4)',
+        outlineOffset: 2,
+        overflow: 'hidden',
+        padding: 0,
+        transition: 'all 0.2s ease',
+      } : undefined}
+    >
+      {isMe && avatarUrl ? (
+        <img src={avatarUrl} alt="自分のアイコン" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+      ) : (
+        getInitials(displayName)
+      )}
+      {(memberRole === 'host' || participantRole === 'host') && (
+        <span className={styles.hostCrown}>👑</span>
+      )}
+      {memberRole === 'moderator' && participantRole !== 'host' && (
+        <span className={styles.hostCrown}>🛡️</span>
+      )}
+      <span className={`${styles.micStatus} ${isMuted ? styles.muted : styles.active}`}>
+        {isMuted ? '🔇' : '🎙️'}
+      </span>
+    </div>
+  )
+}
+
 // ─── スピーカーバブル（モデレーターメニュー付き） ──
 function SpeakerBubble({
   participant,
@@ -87,7 +128,6 @@ function SpeakerBubble({
   const { localParticipant } = useLocalParticipant()
   const remoteParticipant = useRemoteParticipant(participant.userId)
   const lkParticipant = isMe ? localParticipant : remoteParticipant
-  const isSpeaking = useIsSpeaking(lkParticipant)
 
   return (
     <div className={styles.participantBubble} style={{ position: 'relative' }}>
@@ -104,38 +144,15 @@ function SpeakerBubble({
           ★ あなた
         </span>
       )}
-      <div
-        className={`${styles.bubbleAvatar} ${isSpeaking ? styles.speaking : ''}`}
-        style={isMe ? {
-          outline: isSpeaking ? '3px solid #ec4899' : '3px solid rgba(99, 102, 241, 0.4)',
-          outlineOffset: 2,
-          overflow: 'hidden',
-          padding: 0,
-          transition: 'all 0.2s ease',
-        } : undefined}
-      >
-        {/* アバター画像（アップロード済みの場合）*/}
-        {isMe && avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt="自分のアイコン"
-            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
-          />
-        ) : (
-          getInitials(participant.displayName)
-        )}
-        {/* ホスト/モデレーターアイコン */}
-        {(memberRole === 'host' || participant.role === 'host') && (
-          <span className={styles.hostCrown}>👑</span>
-        )}
-        {memberRole === 'moderator' && participant.role !== 'host' && (
-          <span className={styles.hostCrown}>🛡️</span>
-        )}
-        {/* マイクステータス */}
-        <span className={`${styles.micStatus} ${participant.isMuted ? styles.muted : styles.active}`}>
-          {participant.isMuted ? '🔇' : '🎙️'}
-        </span>
-      </div>
+      <SpeakerAvatar
+        lkParticipant={lkParticipant}
+        isMe={isMe}
+        avatarUrl={avatarUrl}
+        displayName={participant.displayName}
+        memberRole={memberRole}
+        participantRole={participant.role}
+        isMuted={participant.isMuted}
+      />
       <span className={styles.bubbleName}>
         {isMe ? 'あなた' : participant.displayName}
       </span>
