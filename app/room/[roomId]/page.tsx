@@ -9,6 +9,7 @@ import {
   useRemoteParticipants,
   useRemoteParticipant,
   useIsSpeaking,
+  RoomAudioRenderer,
 } from '@livekit/components-react'
 import '@livekit/components-styles'
 import { ConnectionState } from 'livekit-client'
@@ -30,6 +31,7 @@ import {
   revokeModerator,
   updateMuteState,
   leaveRoom as leaveRoomState,
+  closeRoom,
 } from '@/lib/roomState'
 import styles from './room.module.css'
 
@@ -482,6 +484,16 @@ function RoomPageContent() {
     return () => { unsub?.() }
   }, [roomId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ルーム終了の監視
+  useEffect(() => {
+    if (stateReady && roomState === null) {
+      if (!isNewRoom) { // モックルーム対応のためにisNewRoomを確認
+        alert('ルームが終了しました。')
+      }
+      router.push('/')
+    }
+  }, [stateReady, roomState, router, isNewRoom])
+
   // ─── LiveKit トークン取得（自分のロールに応じて） ──
   useEffect(() => {
     if (!stateReady && !amIHost) return  // 状態確定まで待機
@@ -575,8 +587,15 @@ function RoomPageContent() {
 
   // ─── 退出処理 ─────────────────────────────────────
   const handleLeave = useCallback(async () => {
-    if (!window.confirm(isNewRoom ? '部屋から退出すると閉じられます。よろしいですか？' : '部屋から退出しますか？')) return
+    if (!window.confirm(isNewRoom ? '部屋から退出しますか？' : '部屋から退出しますか？')) return
     await leaveRoomState(roomId, myUid).catch(() => { })
+    router.push('/')
+  }, [isNewRoom, roomId, myUid, router])
+
+  // ─── 部屋を終了する ───────────────────────────────
+  const handleCloseRoom = useCallback(async () => {
+    if (!window.confirm('本当にこのルームを終了しますか？ (参加者全員が切断されます)')) return
+    await closeRoom(roomId).catch(() => { })
     if (isNewRoom) {
       try {
         const stored = JSON.parse(localStorage.getItem('created_rooms') ?? '[]') as Room[]
@@ -584,7 +603,7 @@ function RoomPageContent() {
       } catch { /* 無視 */ }
     }
     router.push('/')
-  }, [isNewRoom, roomId, myUid, router])
+  }, [isNewRoom, roomId, router])
 
   // ─── Firestore からスピーカー/リスナー一覧を構築 ──
   const speakerMembers: RoomMember[] = roomState
@@ -617,6 +636,7 @@ function RoomPageContent() {
         video={false}
         onDisconnected={handleLeave}
       >
+        <RoomAudioRenderer />
         <div className={styles.roomLayout}>
           {/* ゲストユーザー向けアップグレードバナー（匿名ユーザーのみ表示） */}
           {isGuest && <UpgradeBanner guestName={guestName} />}
@@ -680,7 +700,8 @@ function RoomPageContent() {
                       { icon: '👥', label: '参加者を見る', action: () => { setActiveTab('participants'); setDrawerOpen(true); setShowRoomMenu(false) } },
                       { icon: '🎵', label: 'BGMを操作', action: () => { setActiveTab('bgm'); setDrawerOpen(true); setShowRoomMenu(false) } },
                       { icon: '🔗', label: 'URLをコピー', action: () => { navigator.clipboard.writeText(window.location.href); setShowRoomMenu(false) } },
-                      { icon: '🚪', label: '退出する', action: () => { handleLeave(); setShowRoomMenu(false) }, danger: true },
+                      { icon: '🚪', label: '退出する', action: () => { handleLeave(); setShowRoomMenu(false) } },
+                      ...(amIModerator ? [{ icon: '🛑', label: 'ルームを終了', action: () => { handleCloseRoom(); setShowRoomMenu(false) }, danger: true }] : []),
                     ].map(item => (
                       <button
                         key={item.label}

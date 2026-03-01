@@ -266,6 +266,11 @@ export const leaveRoom = async (
     }).catch(() => { })
 }
 
+// ─── ルームを閉じる（強制終了） ─────────────────────────
+export const closeRoom = async (roomId: string): Promise<void> => {
+    await set(roomStateRef(roomId), null).catch(() => {})
+}
+
 // ─── リアルタイム購読 ─────────────────────────────
 export const subscribeToRoomState = (
     roomId: string,
