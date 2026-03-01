@@ -10,6 +10,7 @@ import {
   useRemoteParticipant,
   useIsSpeaking,
   RoomAudioRenderer,
+  StartAudio,
 } from '@livekit/components-react'
 import '@livekit/components-styles'
 import { ConnectionState } from 'livekit-client'
@@ -632,10 +633,11 @@ function RoomPageContent() {
         serverUrl={livekitUrl}
         token={livekitToken}
         connect={true}
-        audio={true}
+        audio={amISpeaker}
         video={false}
         onDisconnected={handleLeave}
       >
+        <StartAudio label="タップして音声を有効化" />
         <RoomAudioRenderer />
         <div className={styles.roomLayout}>
           {/* ゲストユーザー向けアップグレードバナー（匿名ユーザーのみ表示） */}
@@ -669,11 +671,16 @@ function RoomPageContent() {
                 onClick={() => {
                   // 現在のURLをクリップボードにコピー
                   navigator.clipboard.writeText(window.location.href).then(() => {
-                    alert('部屋のURLをコピーしました！')
+                    const btn = document.getElementById('share-btn-text');
+                    if (btn) {
+                      const orig = btn.innerText;
+                      btn.innerText = '✓ コピーしました';
+                      setTimeout(() => btn.innerText = orig, 2000);
+                    }
                   })
                 }}
               >
-                🔗 シェア
+                <span id="share-btn-text">🔗 シェア</span>
               </button>
               {/* 三点リーダーメニュー */}
               <div style={{ position: 'relative' }}>
@@ -699,7 +706,19 @@ function RoomPageContent() {
                     {[
                       { icon: '👥', label: '参加者を見る', action: () => { setActiveTab('participants'); setDrawerOpen(true); setShowRoomMenu(false) } },
                       { icon: '🎵', label: 'BGMを操作', action: () => { setActiveTab('bgm'); setDrawerOpen(true); setShowRoomMenu(false) } },
-                      { icon: '🔗', label: 'URLをコピー', action: () => { navigator.clipboard.writeText(window.location.href); setShowRoomMenu(false) } },
+                      {
+                        icon: '🔗', label: 'URLをコピー', action: () => {
+                          navigator.clipboard.writeText(window.location.href).then(() => {
+                            setShowRoomMenu(false);
+                            const btn = document.getElementById('share-btn-text');
+                            if (btn) {
+                              const orig = btn.innerText;
+                              btn.innerText = '✓ コピーしました';
+                              setTimeout(() => btn.innerText = orig, 2000);
+                            }
+                          });
+                        }
+                      },
                       { icon: '🚪', label: '退出する', action: () => { handleLeave(); setShowRoomMenu(false) } },
                       ...(amIModerator ? [{ icon: '🛑', label: 'ルームを終了', action: () => { handleCloseRoom(); setShowRoomMenu(false) }, danger: true }] : []),
                     ].map(item => (
@@ -945,7 +964,10 @@ function RoomPageContent() {
                 )}
 
                 {/* BGMタブ — 常駐させて非表示にすることで再生を止めない */}
-                <div style={{ display: activeTab === 'bgm' ? 'flex' : 'none', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                <div style={{
+                  display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden',
+                  ...(activeTab === 'bgm' ? {} : { position: 'absolute', opacity: 0, pointerEvents: 'none', transform: 'scale(0)' })
+                }}>
                   <BGMPlayer />
                 </div>
 
