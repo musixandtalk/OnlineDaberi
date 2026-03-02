@@ -31,11 +31,11 @@ interface YTPlayer {
 const PRESET_TRACKS: Track[] = [
   { id: 'jfKfPfyJRdk', name: 'Lofi Girl — Study Beats', flag: '📚' },
   { id: '5qap5aO4i9A', name: 'Lofi Girl — Sleep / Chill', flag: '🌙' },
+  { id: 'h71V9XFwihw', name: 'Neko Hacker - Chocolate Adventure feat. ななひら', flag: '🍫' },
+  { id: '2V0AwaQhIiw', name: 'Neko Hacker - I Don\'t Care feat. ななひら', flag: '🐈' },
+  { id: '4w3x8F7KxM8', name: 'Neko Hacker - Hack You feat. うごくちゃん', flag: '💻' },
   { id: 'DWcJFNfaw9c', name: 'Coffee Shop Radio', flag: '☕' },
-  { id: 'kgx4WGK0oNU', name: 'Chillhop Radio', flag: '🐾' },
   { id: '7NOSDKb0HlU', name: 'Studio Ghibli Piano', flag: '🌿' },
-  { id: 'y1bXO_H_MBQ', name: '森の鳥の声', flag: '🐦' },
-  { id: 'xNN7iTA57jM', name: '雨と鳥の声', flag: '🌧️' },
 ]
 
 // ─── YouTube URL からビデオIDを抽出 ───────────────
@@ -120,7 +120,7 @@ export default function BGMPlayer() {
         height: '1', width: '1', videoId,
         playerVars: {
           autoplay: 1, loop: 1, playlist: videoId,
-          controls: 0, modestbranding: 1, rel: 0,
+          controls: 0, modestbranding: 1, rel: 0, enablejsapi: 1,
         },
         events: {
           onReady: (e: { target: YTPlayer }) => {

@@ -1,6 +1,7 @@
 'use client'
 // オンダベ — 音声部屋ページ（LiveKit 音声通話・モデレーター・リアルタイム参加者管理）
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Swal from 'sweetalert2'
 import { useParams, useRouter } from 'next/navigation'
 import {
   LiveKitRoom,
@@ -284,7 +285,12 @@ function CustomMicButton({ isMuted, onToggle }: { isMuted: boolean; onToggle: (n
       onToggle(nextMuted)
     } catch (err) {
       console.error('Mic toggle failed:', err)
-      alert("マイクへのアクセスが拒否されたか、デバイスが見つかりません。")
+      Swal.fire({
+        icon: 'error',
+        title: 'マイクへのアクセスが拒否されました',
+        text: 'ブラウザの設定でマイクのアクセスを許可するか、デバイスが見つかりません。',
+        confirmButtonColor: '#6366f1',
+      })
       onToggle(isMuted) // エラー時は元に戻す
     } finally {
       setIsPending(false)
@@ -527,9 +533,17 @@ function RoomPageContent() {
   useEffect(() => {
     if (stateReady && roomState === null) {
       if (!isNewRoom) { // モックルーム対応のためにisNewRoomを確認
-        alert('ルームが終了しました。')
+        Swal.fire({
+          icon: 'info',
+          title: 'ルーム終了',
+          text: 'ホストによりルームが終了しました。',
+          confirmButtonColor: '#6366f1',
+        }).then(() => {
+          router.push('/')
+        })
+      } else {
+        router.push('/')
       }
-      router.push('/')
     }
   }, [stateReady, roomState, router, isNewRoom])
 
@@ -713,14 +727,36 @@ function RoomPageContent() {
 
   // ─── 退出処理 ─────────────────────────────────────
   const handleLeave = useCallback(async () => {
-    if (!window.confirm(isNewRoom ? '部屋から退出しますか？' : '部屋から退出しますか？')) return
+    const result = await Swal.fire({
+      title: '部屋から退出しますか？',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#f87171',
+      cancelButtonColor: '#4b5563',
+      confirmButtonText: '退出する',
+      cancelButtonText: 'キャンセル'
+    })
+
+    if (!result.isConfirmed) return
+
     await leaveRoomState(roomId, myUid).catch(() => { })
     router.push('/')
-  }, [isNewRoom, roomId, myUid, router])
+  }, [roomId, myUid, router])
 
   // ─── 部屋を終了する ───────────────────────────────
   const handleCloseRoom = useCallback(async () => {
-    if (!window.confirm('本当にこのルームを終了しますか？ (参加者全員が切断されます)')) return
+    const result = await Swal.fire({
+      title: '本当にこのルームを終了しますか？',
+      text: '参加者全員が切断されます。',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#f87171',
+      cancelButtonColor: '#4b5563',
+      confirmButtonText: '終了する',
+      cancelButtonText: 'キャンセル'
+    })
+    if (!result.isConfirmed) return
+
     await closeRoom(roomId).catch(() => { })
     if (isNewRoom) {
       try {
@@ -881,9 +917,17 @@ function RoomPageContent() {
                 <div
                   className={styles.zoneTitleRow}
                   style={{ cursor: 'pointer', marginBottom: youtubeVideoId ? 16 : 0, borderBottom: youtubeVideoId ? '1px solid var(--border-color)' : 'none', paddingBottom: youtubeVideoId ? 12 : 0 }}
-                  onClick={() => {
+                  onClick={async () => {
                     if (!youtubeVideoId) {
-                      const url = prompt('YouTube URLを入力してください:')
+                      const { value: url } = await Swal.fire({
+                        title: 'YouTube URLを入力',
+                        input: 'url',
+                        inputPlaceholder: 'https://youtube.com/watch?v=...',
+                        showCancelButton: true,
+                        confirmButtonText: '再生',
+                        cancelButtonText: 'キャンセル',
+                        confirmButtonColor: '#6366f1',
+                      })
                       if (url) applyYoutubeUrl(url)
                     }
                   }}
@@ -1345,7 +1389,7 @@ function RoomPageContent() {
             </button>
           </footer>
         </div>
-      </LiveKitRoom>
+      </LiveKitRoom >
     </>
   )
 }
