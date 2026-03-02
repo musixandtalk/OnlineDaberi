@@ -11,9 +11,10 @@ import {
   useIsSpeaking,
   RoomAudioRenderer,
   StartAudio,
+  TrackToggle,
 } from '@livekit/components-react'
 import '@livekit/components-styles'
-import { ConnectionState } from 'livekit-client'
+import { ConnectionState, Track } from 'livekit-client'
 import { mockRooms } from '@/lib/mockData'
 import type { Room, RoomParticipant } from '@/types'
 import BGMPlayer from '@/components/BGMPlayer/BGMPlayer'
@@ -33,6 +34,8 @@ import {
   updateMuteState,
   leaveRoom as leaveRoomState,
   closeRoom,
+  updateYoutubeVideo,
+  updateYoutubeState,
 } from '@/lib/roomState'
 import styles from './room.module.css'
 
@@ -250,24 +253,6 @@ function ListenerBubble({
   )
 }
 
-// LiveKit マイクコントロール（実際の音声通話に接続するコンポーネント）
-function MicControl({ isMuted, onToggle }: { isMuted: boolean; onToggle: () => void }) {
-  const { localParticipant } = useLocalParticipant()
-  const connectionState = useConnectionState()
-  const isConnected = connectionState === ConnectionState.Connected
-
-  // マイクのON/OFFを LiveKit に反映
-  useEffect(() => {
-    if (!localParticipant || !isConnected) return
-    localParticipant.setMicrophoneEnabled(!isMuted)
-  }, [isMuted, localParticipant, isConnected])
-
-  return (
-    <span className={`${styles.controlBtnIcon}`}>
-      {!isConnected ? '⏳' : isMuted ? '🔇' : '🎙️'}
-    </span>
-  )
-}
 
 // リモート参加者の音量を個別に変更するコンポーネント
 function RemoteVolumeControl({ participantIdentity, displayName }: { participantIdentity: string; displayName: string }) {
@@ -450,7 +435,7 @@ function RoomPageContent() {
   const [userAvatar, setUserAvatar] = useState<string | null>(null)
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
   const [youtubeInput, setYoutubeInput] = useState('')
-  const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null)
+  const youtubeVideoId = roomState?.youtubeVideoId ?? null
   const [youtubeVolume, setYoutubeVolume] = useState(80)
   const [livekitToken, setLivekitToken] = useState<string | null>(null)
 
@@ -458,7 +443,8 @@ function RoomPageContent() {
   const avatarBtnRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
-  const channelRef = useRef<BroadcastChannel | null>(null)
+  const ytPlayerRef = useRef<any>(null)
+  const isYoutubeStateUpdatingRef = useRef(false)
   const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL ?? ''
 
   // ─── Firestore 状態の初期化 & 購読 ────────────────
@@ -502,7 +488,7 @@ function RoomPageContent() {
       try {
         const role = amIHost ? 'host' : myRole
         const res = await fetch(
-          `/api/livekit-token?room=${encodeURIComponent(room.livekitRoomName)}&username=${encodeURIComponent(myUid)}&role=${role}`
+          `/api/livekit-token?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(myUid)}&role=${role}`
         )
         const data = await res.json()
         if (data.token) setLivekitToken(data.token)
@@ -513,19 +499,9 @@ function RoomPageContent() {
     fetchToken()
   }, [stateReady, myRole]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ─── BroadcastChannel（YouTube 同期） ──────────────
-  useEffect(() => {
-    const ch = new BroadcastChannel(`ondabe-room-${roomId}`)
-    channelRef.current = ch
-    ch.onmessage = (e) => {
-      if (e.data?.type === 'yt-sync') setYoutubeVideoId(e.data.videoId ?? null)
-    }
-    return () => ch.close()
-  }, [roomId])
-
-  const applyYoutubeVideoId = (videoId: string | null) => {
-    setYoutubeVideoId(videoId)
-    channelRef.current?.postMessage({ type: 'yt-sync', videoId })
+  // ─── YouTube 同期 ──────────────
+  const applyYoutubeVideoId = async (videoId: string | null) => {
+    await updateYoutubeVideo(roomId, videoId)
   }
 
   const applyYoutubeUrl = (input: string) => {
@@ -535,10 +511,107 @@ function RoomPageContent() {
     setYoutubeInput('')
   }
   const sendYoutubeVolume = (vol: number) => {
-    iframeRef.current?.contentWindow?.postMessage(
-      JSON.stringify({ event: 'command', func: 'setVolume', args: [vol] }), '*'
-    )
+    if (ytPlayerRef.current && ytPlayerRef.current.setVolume) {
+      ytPlayerRef.current.setVolume(vol)
+    } else {
+      iframeRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: 'command', func: 'setVolume', args: [vol] }), '*'
+      )
+    }
   }
+
+  // YouTube IFrame APIのロードと初期化
+  useEffect(() => {
+    if (!youtubeVideoId) return
+
+    // すでにAPIがロードされていなければロード
+    if (!window.document.getElementById('youtube-iframe-api')) {
+      const tag = document.createElement('script')
+      tag.id = 'youtube-iframe-api'
+      tag.src = 'https://www.youtube.com/iframe_api'
+      const firstScriptTag = document.getElementsByTagName('script')[0]
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag)
+    }
+
+    const initPlayer = () => {
+      if (!iframeRef.current || !window.YT) return
+
+      ytPlayerRef.current = new window.YT.Player(iframeRef.current, {
+        events: {
+          onReady: (event: any) => {
+            event.target.setVolume(youtubeVolume)
+          },
+          onStateChange: (event: any) => {
+            // Firestoreからの更新反映によるイベント発火は無視
+            if (isYoutubeStateUpdatingRef.current) return
+
+            const isPlaying = event.data === window.YT.PlayerState.PLAYING
+            const isPausedOrBuffering = event.data === window.YT.PlayerState.PAUSED
+
+            if (isPlaying || isPausedOrBuffering) {
+              // 再生位置と状態を更新
+              const currentTime = event.target.getCurrentTime()
+              updateYoutubeState(roomId, isPlaying, currentTime).catch(console.error)
+            }
+          }
+        }
+      })
+    }
+
+    if (window.YT && window.YT.Player) {
+      initPlayer()
+    } else {
+      (window as any).onYouTubeIframeAPIReady = initPlayer
+    }
+
+    return () => {
+      if (ytPlayerRef.current && ytPlayerRef.current.destroy) {
+        ytPlayerRef.current.destroy()
+        ytPlayerRef.current = null
+      }
+    }
+  }, [youtubeVideoId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // FirestoreのYouTube状態を他ユーザーへ適用
+  useEffect(() => {
+    if (!roomState?.youtubeState || !ytPlayerRef.current || !ytPlayerRef.current.getPlayerState) return
+
+    const { isPlaying, currentTime, updatedAt } = roomState.youtubeState
+    const now = Date.now()
+    const timeSinceUpdate = (now - updatedAt) / 1000
+
+    // 更新から一定時間が経ちすぎているものは無視（数秒）
+    if (timeSinceUpdate > 5) return;
+
+    try {
+      const playerState = ytPlayerRef.current.getPlayerState()
+      const playerCurrentTime = ytPlayerRef.current.getCurrentTime()
+
+      isYoutubeStateUpdatingRef.current = true
+
+      // 状態が違えば合わせる
+      const isCurrentlyPlaying = playerState === window.YT.PlayerState.PLAYING
+
+      // 再生位置のズレが1.5秒以上あればSeek
+      if (Math.abs(playerCurrentTime - currentTime) > 1.5) {
+        ytPlayerRef.current.seekTo(currentTime + timeSinceUpdate, true)
+      }
+
+      if (isPlaying && !isCurrentlyPlaying) {
+        ytPlayerRef.current.playVideo()
+      } else if (!isPlaying && isCurrentlyPlaying) {
+        ytPlayerRef.current.pauseVideo()
+      }
+
+      setTimeout(() => {
+        isYoutubeStateUpdatingRef.current = false
+      }, 500)
+    } catch (e) {
+      // Player not fully ready yet
+      isYoutubeStateUpdatingRef.current = false
+    }
+
+  }, [roomState?.youtubeState])
 
 
 
@@ -566,11 +639,11 @@ function RoomPageContent() {
   }, [roomId, myUid, myHandRaised])
 
   // ─── ミュート状態を Firestore にも反映 ────────────
-  const handleToggleMute = useCallback(async () => {
-    const next = !isMuted
-    setIsMuted(next)
-    await updateMuteState(roomId, myUid, next)
-  }, [roomId, myUid, isMuted])
+  const handleToggleMute = useCallback(async (enabled: boolean) => {
+    const nextMuted = !enabled
+    setIsMuted(nextMuted)
+    await updateMuteState(roomId, myUid, nextMuted)
+  }, [roomId, myUid])
 
   // ─── チャット送信 ─────────────────────────────────
   const handleSendMessage = useCallback(() => {
@@ -633,7 +706,7 @@ function RoomPageContent() {
         serverUrl={livekitUrl}
         token={livekitToken}
         connect={true}
-        audio={amISpeaker}
+        audio={false}
         video={false}
         onDisconnected={handleLeave}
       >
@@ -780,8 +853,9 @@ function RoomPageContent() {
                   <>
                     <div className={styles.youtubePlayerWrap}>
                       <iframe
+                        id="youtube-player-iframe"
                         ref={iframeRef}
-                        src={`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&enablejsapi=1`}
+                        src={`https://www.youtube.com/embed/${youtubeVideoId}?enablejsapi=1&autoplay=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                         title="YouTube 動画プレイヤー"
@@ -1032,15 +1106,18 @@ function RoomPageContent() {
             {/* マイクボタン（スピーカーのみ有効） */}
             {amISpeaker ? (
               <MicrophoneSelector>
-                <button
-                  id="mute-toggle-btn"
-                  className={`${styles.controlBtn} ${styles.muteBtn} ${isMuted ? styles.muted : styles.unmuted}`}
-                  onClick={handleToggleMute}
-                  style={{ borderRadius: '8px 0 0 8px' }}
-                >
-                  <MicControl isMuted={isMuted} onToggle={handleToggleMute} />
-                  <span className={styles.controlBtnLabel}>{micLabel}</span>
-                </button>
+                <div style={{ display: 'flex' }}>
+                  <TrackToggle
+                    id="mute-toggle-btn"
+                    source={Track.Source.Microphone}
+                    className={`${styles.controlBtn} ${styles.muteBtn} ${isMuted ? styles.muted : styles.unmuted}`}
+                    style={{ borderRadius: '8px 0 0 8px', borderRight: '1px solid var(--border-color)', border: 'none' }}
+                    onChange={(enabled) => handleToggleMute(enabled)}
+                  >
+                    <span className={styles.controlBtnIcon}>{isMuted ? '🔇' : '🎙️'}</span>
+                    <span className={styles.controlBtnLabel}>{isMuted ? 'ミュート中' : 'オン'}</span>
+                  </TrackToggle>
+                </div>
               </MicrophoneSelector>
             ) : (
               /* リスナーには聴いているだけバッジ */

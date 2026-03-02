@@ -31,6 +31,12 @@ export interface RoomState {
     raisedHandUids: string[]   // 手を挙げているUID
     members: Record<string, RoomMember>  // uid→メンバー情報
     createdAt: number
+    youtubeVideoId?: string | null
+    youtubeState?: {
+        isPlaying: boolean
+        currentTime: number
+        updatedAt: number
+    }
 }
 
 // ─── ルーム状態のパス ───────────────────────────────
@@ -81,6 +87,7 @@ export const initRoomState = async (
         raisedHandUids: [],
         members: { [hostUid]: hostMember },
         createdAt: serverTimestamp(),
+        youtubeVideoId: null,
     })
 }
 
@@ -268,7 +275,37 @@ export const leaveRoom = async (
 
 // ─── ルームを閉じる（強制終了） ─────────────────────────
 export const closeRoom = async (roomId: string): Promise<void> => {
-    await set(roomStateRef(roomId), null).catch(() => {})
+    await set(roomStateRef(roomId), null).catch(() => { })
+}
+
+// ─── YouTube動画IDを更新 ───────────────────────────
+export const updateYoutubeVideo = async (
+    roomId: string,
+    videoId: string | null,
+): Promise<void> => {
+    await update(roomStateRef(roomId), {
+        youtubeVideoId: videoId,
+        youtubeState: {
+            isPlaying: true, // 新しい動画の時は最初から再生
+            currentTime: 0,
+            updatedAt: Date.now()
+        }
+    })
+}
+
+// ─── YouTube再生状態を更新 ─────────────────────────
+export const updateYoutubeState = async (
+    roomId: string,
+    isPlaying: boolean,
+    currentTime: number,
+): Promise<void> => {
+    await update(roomStateRef(roomId), {
+        youtubeState: {
+            isPlaying,
+            currentTime,
+            updatedAt: Date.now()
+        }
+    })
 }
 
 // ─── リアルタイム購読 ─────────────────────────────
