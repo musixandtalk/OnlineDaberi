@@ -11,7 +11,6 @@ import {
   useIsSpeaking,
   RoomAudioRenderer,
   StartAudio,
-  TrackToggle,
 } from '@livekit/components-react'
 import '@livekit/components-styles'
 import { ConnectionState, Track } from 'livekit-client'
@@ -253,6 +252,59 @@ function ListenerBubble({
   )
 }
 
+// 実際の音声通話に接続するカスタムマイクボタン
+function CustomMicButton({ isMuted, onToggle }: { isMuted: boolean; onToggle: (next: boolean) => void }) {
+  const { localParticipant } = useLocalParticipant()
+  const connectionState = useConnectionState()
+  const isConnected = connectionState === ConnectionState.Connected
+  const [isPending, setIsPending] = useState(false)
+
+  // コンポーネントのレンダリング・再接続時に実際のデバイス状態と同期する
+  useEffect(() => {
+    if (!localParticipant || !isConnected) return
+    const syncMic = async () => {
+      // ユーザーが「ミュート解除」していて、かつLiveKit上のマイクがOFFだったらONにする
+      if (!isMuted && !localParticipant.isMicrophoneEnabled) {
+        await localParticipant.setMicrophoneEnabled(true).catch(console.error)
+      }
+      // ユーザーが「ミュート」していて、かつLiveKit上のマイクがONだったらOFFにする
+      else if (isMuted && localParticipant.isMicrophoneEnabled) {
+        await localParticipant.setMicrophoneEnabled(false).catch(console.error)
+      }
+    }
+    syncMic()
+  }, [isMuted, localParticipant, isConnected])
+
+  const handleClick = async () => {
+    if (!localParticipant || !isConnected || isPending) return
+    setIsPending(true)
+    const nextMuted = !isMuted
+    try {
+      await localParticipant.setMicrophoneEnabled(!nextMuted)
+      onToggle(nextMuted)
+    } catch (err) {
+      console.error('Mic toggle failed:', err)
+      alert("マイクへのアクセスが拒否されたか、デバイスが見つかりません。")
+      onToggle(isMuted) // エラー時は元に戻す
+    } finally {
+      setIsPending(false)
+    }
+  }
+
+  return (
+    <button
+      id="mute-toggle-btn"
+      className={`${styles.controlBtn} ${styles.muteBtn} ${isMuted ? styles.muted : styles.unmuted}`}
+      onClick={handleClick}
+      style={{ borderRadius: '8px 0 0 8px', borderRight: '1px solid var(--border-color)', border: 'none' }}
+      disabled={!isConnected || isPending}
+      title={isConnected ? 'マイクのオン／オフを切り替え' : '接続中...'}
+    >
+      <span className={styles.controlBtnIcon}>{!isConnected || isPending ? '⏳' : isMuted ? '🔇' : '🎙️'}</span>
+      <span className={styles.controlBtnLabel}>{isMuted ? 'ミュート中' : 'オン'}</span>
+    </button>
+  )
+}
 
 // リモート参加者の音量を個別に変更するコンポーネント
 function RemoteVolumeControl({ participantIdentity, displayName }: { participantIdentity: string; displayName: string }) {
@@ -1107,16 +1159,10 @@ function RoomPageContent() {
             {amISpeaker ? (
               <MicrophoneSelector>
                 <div style={{ display: 'flex' }}>
-                  <TrackToggle
-                    id="mute-toggle-btn"
-                    source={Track.Source.Microphone}
-                    className={`${styles.controlBtn} ${styles.muteBtn} ${isMuted ? styles.muted : styles.unmuted}`}
-                    style={{ borderRadius: '8px 0 0 8px', borderRight: '1px solid var(--border-color)', border: 'none' }}
-                    onChange={(enabled) => handleToggleMute(enabled)}
-                  >
-                    <span className={styles.controlBtnIcon}>{isMuted ? '🔇' : '🎙️'}</span>
-                    <span className={styles.controlBtnLabel}>{isMuted ? 'ミュート中' : 'オン'}</span>
-                  </TrackToggle>
+                  <CustomMicButton
+                    isMuted={isMuted}
+                    onToggle={(enabled) => handleToggleMute(!enabled)}
+                  />
                 </div>
               </MicrophoneSelector>
             ) : (
