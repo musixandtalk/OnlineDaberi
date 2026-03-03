@@ -129,14 +129,47 @@ function SpeakerBubble({
   memberRole?: string        // このバブルの人のロール
 }) {
   const [showMenu, setShowMenu] = useState(false)
+  const [showVolume, setShowVolume] = useState(false)
+  const [volume, setVolume] = useState(100)
+  const bubbleRef = useRef<HTMLDivElement>(null)
 
   // ─── LiveKit から実際の発話状態を取得 ───
   const { localParticipant } = useLocalParticipant()
   const remoteParticipant = useRemoteParticipant(participant.userId)
   const lkParticipant = isMe ? localParticipant : remoteParticipant
 
+  // 音量変更を LiveKit の参加者に反映
+  const handleVolumeChange = (val: number) => {
+    setVolume(val)
+    if (remoteParticipant) {
+      remoteParticipant.audioTrackPublications.forEach(pub => {
+        if (pub.audioTrack && 'setVolume' in pub.audioTrack) {
+          (pub.audioTrack as { setVolume: (v: number) => void }).setVolume(val / 100)
+        }
+      })
+    }
+  }
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (bubbleRef.current && !bubbleRef.current.contains(e.target as Node)) {
+        setShowVolume(false)
+        setShowMenu(false)
+      }
+    }
+    if (showVolume || showMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showVolume, showMenu])
+
   return (
-    <div className={styles.participantBubble} style={{ position: 'relative' }}>
+    <div
+      ref={bubbleRef}
+      className={styles.participantBubble}
+      style={{ position: 'relative', cursor: isMe ? 'default' : 'pointer' }}
+      onClick={() => { if (!isMe) { setShowVolume(v => !v); setShowMenu(false); } }}
+    >
       {/* 「あなた」バッジ */}
       {isMe && (
         <span style={{
@@ -166,12 +199,50 @@ function SpeakerBubble({
         {memberRole === 'host' ? '👑 ホスト' : memberRole === 'moderator' ? '🛡️ モデレーター' : '🎙️ スピーカー'}
       </span>
 
+      {/* ボリューム調整ポップアップ（自分でない場合） */}
+      {showVolume && !isMe && (
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#1e1e2e',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 12,
+            padding: '8px 12px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            zIndex: 10,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 6,
+            minWidth: 140,
+            cursor: 'default',
+          }}
+        >
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>音量調整</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+            <span style={{ fontSize: '0.75rem' }}>{volume === 0 ? '🔇' : '🔉'}</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={volume}
+              onChange={e => handleVolumeChange(Number(e.target.value))}
+              style={{ flex: 1, accentColor: '#818cf8', cursor: 'pointer' }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* モデレーターメニュー（自分がモデレーターで、かつ相手がホストでない時） */}
       {isModerator && !isMe && !isHost && (
         <div style={{ position: 'relative', marginTop: 4 }}>
           <button
             className={styles.modMenuBtn}
-            onClick={() => setShowMenu(v => !v)}
+            onClick={(e) => { e.stopPropagation(); setShowMenu(v => !v); setShowVolume(false); }}
             title="管理操作"
           >⋯</button>
           {showMenu && (
@@ -578,8 +649,14 @@ function RoomPageContent() {
   }
   const sendYoutubeVolume = (vol: number) => {
     if (ytPlayerRef.current && ytPlayerRef.current.setVolume) {
+      if (typeof ytPlayerRef.current.unMute === 'function') {
+        ytPlayerRef.current.unMute()
+      }
       ytPlayerRef.current.setVolume(vol)
     } else {
+      iframeRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*'
+      )
       iframeRef.current?.contentWindow?.postMessage(
         JSON.stringify({ event: 'command', func: 'setVolume', args: [vol] }), '*'
       )
@@ -605,6 +682,9 @@ function RoomPageContent() {
       ytPlayerRef.current = new window.YT.Player(iframeRef.current, {
         events: {
           onReady: (event: any) => {
+            if (typeof event.target.unMute === 'function') {
+              event.target.unMute()
+            }
             event.target.setVolume(youtubeVolume)
           },
           onStateChange: (event: any) => {

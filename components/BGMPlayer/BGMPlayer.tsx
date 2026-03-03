@@ -123,7 +123,10 @@ export default function BGMPlayer() {
           controls: 0, modestbranding: 1, rel: 0, enablejsapi: 1,
         },
         events: {
-          onReady: (e: { target: YTPlayer }) => {
+          onReady: (e: { target: YTPlayer & { unMute(): void } }) => {
+            if (typeof e.target.unMute === 'function') {
+              e.target.unMute()
+            }
             e.target.setVolume(volume)
             e.target.playVideo()
           },
@@ -189,7 +192,12 @@ export default function BGMPlayer() {
   // ─── 音量変更 ────────────────────────────────────
   const handleVolume = (v: number) => {
     setVolume(v)
-    playerRef.current?.setVolume(v)
+    if (playerRef.current) {
+      if (typeof (playerRef.current as any).unMute === 'function') {
+        (playerRef.current as any).unMute()
+      }
+      playerRef.current.setVolume(v)
+    }
   }
 
   return (
